@@ -1,5 +1,3 @@
-
-
 # Guide to barcode sequencing
 
 This repo is holding the analyses that hopes to help shape a bit of

@@ -1,0 +1,31 @@
+
+```{r}
+library(tidyverse)
+library(magrittr)
+
+g <- crossing(Genotype_Proportion=10^seq(-6,-3),Population=c(1e9),
+        Bottleneck_Fraction=c(1,0.5,0.25,0.1,0.01,0.001)
+        ) %>%
+    mutate(Lambda=Bottleneck_Fraction*Population*Genotype_Proportion) %>%
+    mutate(CV=sqrt(Lambda)/Lambda)%>%
+    mutate(
+        Genotype_Proportion=factor(format(Genotype_Proportion,scientific=F)),
+        Population=factor(format(Population,scientific=T))
+        ) %T>%
+    print() %>%
+    ggplot() + theme_bw() +
+    aes(x=Bottleneck_Fraction)+
+    scale_x_log10(name="Bottlenecking fraction of population passaged",
+        breaks=10^seq(-3,1),limits=c(10^-3,10^0))+
+    aes(y=CV)+scale_y_log10(name="CV of genotype proportion")+
+    aes(linetype=Genotype_Proportion)+
+    scale_linetype_discrete(
+        "Proportion of the\npopulation that\nis the i-th genotype"
+        )+
+    geom_line()
+g
+
+ggsave("../output/bottlenecking_cv-of-proportion.pdf",g,width=6,height=4)
+
+```
+
