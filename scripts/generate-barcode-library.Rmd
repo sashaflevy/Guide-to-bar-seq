@@ -1,0 +1,90 @@
+
+```{r,setup-functions}
+lookup <- c("00"=0,"01"=1,"10"=2,"11"=3)
+
+intToBase4 <- function(x) {
+    lapply(x,function(x){
+        x<-paste0(rev(as.integer(intToBits(x))),collapse=""); 
+        return( paste0(
+                lookup[substring(x,seq(1,nchar(x),2),seq(2,nchar(x),2))],
+            collapse="") 
+            )
+        }
+        )
+}
+intToBase4(0)
+intToBase4(1:24)
+
+dna_lookup <- c("00"="A","01"="T","10"="C","11"="G")
+intToDNA <- function(x,bases=6) {
+    lapply(x,function(x){
+        x<-paste0(rev(as.integer(intToBits(x))[1:(bases*2)]),collapse=""); 
+        return( paste0(
+                dna_lookup[substring(x,seq(1,nchar(x),2),seq(2,nchar(x),2))],
+            collapse="") 
+            )
+        }
+        )
+}
+intToDNA(0)
+intToDNA(c(1:5,500:505,((4^6-5):4^6)))
+
+intToDNA(runif(10,min=0,max=4^6),bases=6)
+
+substitution_lookup <- list(
+    "A"=c("T","C","G"),
+    "T"=c("C","G","A"),
+    "C"=c("G","A","T"),
+    "G"=c("A","T","C"))
+errorz <- function(x,seqeuncing_substitution=1e-1) {
+    x <- strsplit(x,"")[[1]]
+for (i in seq(from=0,to=rpois(1,lambda=length(x)*seqeuncing_substitution))[-1]) {
+        j <- base::sample(1:length(x),size=1,replace=F)
+        x[j] <- substitution_lookup[[x[j]]][floor(runif(1,1,4))]
+    }
+    return(paste0(x,collapse=""))
+}
+errorz("ATCATAG",1e-1)
+
+```
+
+```{r,setup-canonical-sequences}
+library(tidyverse)
+
+makeFakeData <- function(howmanycodes=10,howmanyofeach=10,bases=4) {
+    tibble(
+        Canonical=intToDNA(runif(howmanycodes,min=0,max=4^bases),
+            bases=bases),
+        Abundance=howmanyofeach
+        ) %>%
+        unnest() %>%
+        group_by(Canonical) %>%
+        transmute(Read=list(rep(unlist(Canonical),times=Abundance))) %>% 
+        unnest(Read) %>%
+        rowwise%>%
+        mutate(Read=errorz(Read,1e-1)) 
+}
+z <- makeFakeData(howmanycodes=1e1,howmanyofeach=1e2)
+hist(table(z$Read))
+
+
+
+```
+
+Make this as a table lookup thing, so only ID specific barcodes if
+it's needed. 
+
+Maybe just calculate the expected mistakes as independent events
+and poisson it.
+
+```{r,simulate-mutations}
+
+```
+
+Calculate what each class of barcode is and spit it out in a FASTQ.
+
+```{r,write-libraries}
+
+```
+
+Shuffle it?
