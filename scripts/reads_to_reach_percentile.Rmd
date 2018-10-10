@@ -1,16 +1,17 @@
 
 ```{r}
-g <- tibble(readz=c(seq(0.4e7,1e7,0.1e7),seq(1e7,1e8,1e7),seq(1e8,1e9,1e8))) %>% 
+library(tidyverse)
+
+g <- tibble(readz=c(seq(1e8,1e9,1e8),seq(1e9,1e10,1e9),seq(1e10,1e11,1e10))) %>% 
     mutate(distz=lapply(readz,function(x){ 
-            data.frame(particular=0:200,
-                cumprob=ppois(0:200,lambda=1/4e6*x,lower.tail=F)) 
-        })) %>% unnest %>% filter(cumprob>0.95) %>% group_by(readz) %>% 
+            data.frame(particular=0:300,
+                cumprob=ppois(0:300,lambda=1/4e8*x,lower.tail=F)) 
+        })) %>% unnest %>% filter(cumprob>0.99) %>% group_by(readz) %>% 
     summarize(particular=max(particular)) %>% 
     ggplot()+aes(x=readz,y=particular)+geom_point()+theme_bw()+
     scale_x_log10()+
     ylab("99th percentile of reads per barcode")+
     xlab("Reads used (samples in poisson distribution of 400e6 barcodes)")
-
 g
 
 ```
