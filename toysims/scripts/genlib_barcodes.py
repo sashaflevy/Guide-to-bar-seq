@@ -48,19 +48,28 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="this thing makes libraries of barcodes, with or without simulated reads per")
     parser.add_argument("pattern",help="pattern of the barcode, with N as random bases",type=str)
-    parser.add_argument("--gencount",help="generate with counts",action="store_true")
+    parser.add_argument("outfile",help="where to write out",type=str)
     parser.add_argument("--number-variants",default=100,type=float)
-    parser.add_argument("--barcodes-per-variant",default=1,type=float)
-    parser.add_argument("--counts-exponent",default=1,type=float)
-    parser.add_argument("--counts-mean",default=10,type=float)
-    parser.add_argument("--counts-noise",default=1,type=float)
-    parser.add_argument("--per-base-error-rate",default=0.01,type=float)
+    parser.add_argument("--number-barcoded-clones",default=1000,type=float)
+#    parser.add_argument("--counts-exponent",default=1,type=float)
+#    parser.add_argument("--counts-mean",default=10,type=float)
+#    parser.add_argument("--counts-noise",default=1,type=float)
+#    parser.add_argument("--per-base-error-rate",default=0.01,type=float)
     args = parser.parse_args()
 
-    print(randBarcode(args.pattern))
+    barcode_to_variant = list()
 
-#    if not args.p and not args.q:
-#        raise Exception("I need to know what to do, you've told me nothing to do")
+    for i in range(args.number_barcoded_clones):
+        barcode_to_variant.append(
+            {   randBarcode(args.pattern):
+                int(numpy.floor(numpy.random.uniform(0,args.number_variants,1)))
+                }
+            )
+
+    with open(args.outfile,"w") as f:
+        for i in barcode_to_variant:
+            f.write( list(i.keys())[0] +"\t"+ str(list(i.values())[0]) +"\n" )
+
 
 #        for i, afile in enumerate(this_entry["f"]):
 #            if not os.path.isfile(afile):
