@@ -59,7 +59,7 @@ def randBarcode(pattern):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="This is going to make a "+
-            "degenerate barcode library file, so each barcode and the variant "+
+            "degenerate barcode library file, so each barcode and the lineage "+
             "name that it maps to.")
     parser.add_argument("pattern",help="Pattern of the barcode, specified in "+
             "IUPAC codes. So, this can be the full construct.",
@@ -68,33 +68,33 @@ if __name__ == '__main__':
             "This should describe the parameters, basically. It'll then have "+
             "a CSV and a YAML generated onto that basename.",
         type=str)
-    parser.add_argument("--number-variants",help="The number of different "+
-            "variants to try to barcode.",
+    parser.add_argument("--number-lineages",help="The number of different "+
+            "lineages to try to barcode.",
         default=100, type=float)
     parser.add_argument("--number-barcoded-clones",help="Essentially, the "+
             "number of barcodes in the library. This is probably going to be "+
-            "larger than the number of variants",
+            "larger than the number of lineages",
         default=1000, type=float)
     args = parser.parse_args()
 
-    barcode_to_variant = list()
+    barcode_to_lineage = list()
 
     for i in range(args.number_barcoded_clones):
-        barcode_to_variant.append(
+        barcode_to_lineage.append(
             {   randBarcode(args.pattern):
-                int(numpy.floor(numpy.random.uniform(0,args.number_variants,1)))
+                int(numpy.floor(numpy.random.uniform(0,args.number_lineages,1)))
                 }
             )
 
     with open(args.outbase+".csv","w") as f:
-        for i in barcode_to_variant:
+        for i in barcode_to_lineage:
             f.write( list(i.keys())[0] +","+ str(list(i.values())[0]) +"\n" )
 
     with open(args.outbase+".yaml","w") as f:
-        f.write(yaml.dump(barcode_to_variant))
+        f.write(yaml.dump(barcode_to_lineage))
 
     with open(args.outbase+".fasta","w") as f:
-        for i in barcode_to_variant:
+        for i in barcode_to_lineage:
             f.write( "> "+ str(list(i.values())[0]) +"\n"+ list(i.keys())[0] +"\n")
 
 
