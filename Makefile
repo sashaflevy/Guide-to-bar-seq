@@ -1,7 +1,9 @@
 
+.PHONY: all simulations clean
+all: simulations
 
-
-
+simulations: ./scripts/nextflow scripts/run_simulations.nf scripts/run_simulations.nfconfig
+	$(word 1,$^) $(word 2,$^) -c $(word 3,$^) -resume
 
 # Here's a rule to just convert PDFs to PNGs for good sharing
 output/%.png: output/%.pdf
@@ -10,3 +12,6 @@ output/%.png: output/%.pdf
 # Here's a rule to just convert PDFs to JPGs for easy sharing
 output/%.jpg: output/%.pdf
 	convert $< $@
+
+clean:
+	rm -r work .nextflow* reports tmp
