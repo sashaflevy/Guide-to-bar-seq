@@ -3,19 +3,8 @@
 # using
 import argparse
 import yaml
-# not sure
-import os
-import sys
-import maps
-import hashlib 
-import datetime
-import isodate
-import re 
-import shutil
-from Bio import Seq, SeqRecord
-import numpy
-import itertools
 import re
+import numpy
 
 
 complement_dictionary = {
@@ -70,12 +59,18 @@ if __name__ == '__main__':
         type=str)
     parser.add_argument("--number-lineages",help="The number of different "+
             "lineages to try to barcode.",
-        default=100, type=float)
+        default=100, type=int)
     parser.add_argument("--number-barcoded-clones",help="Essentially, the "+
             "number of barcodes in the library. This is probably going to be "+
             "larger than the number of lineages",
-        default=1000, type=float)
+        default=1000, type=int)
+    parser.add_argument("--replicate",help="A replicate ID to prevent "+
+            "filename collisions.",
+        default="", type=str)
     args = parser.parse_args()
+
+    baseNameOut = args.outbase+"_"+args.pattern+"_"+str(args.number_lineages)+"lineages_"+str(args.number_barcoded_clones)+"clones_replicate"+args.replicate
+
 
     barcode_to_lineage = list()
 
@@ -86,10 +81,10 @@ if __name__ == '__main__':
                 }
             )
 
-    with open(args.outbase+".yaml","w") as f:
+    with open(baseNameOut+".yaml","w") as f:
         f.write(yaml.dump(barcode_to_lineage))
 
-    with open(args.outbase+".fasta","w") as f:
+    with open(baseNameOut+".fasta","w") as f:
         for i in barcode_to_lineage:
             f.write( "> "+ str(list(i.values())[0]) +"\n"+ list(i.keys())[0] +"\n")
 

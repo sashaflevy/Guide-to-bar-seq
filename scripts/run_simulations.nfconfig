@@ -11,7 +11,7 @@ executor {
 
 singularity {
     enabled = true
-    cacheDir = "~/.singularity"
+    cacheDir = "$HOME/.singularity"
     autoMounts = true
 }
 
