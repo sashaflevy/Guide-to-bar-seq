@@ -66,7 +66,7 @@ if __name__ == '__main__':
         type=str)
     parser.add_argument("outbase",help="The base filename to write out to. "+
             "This should describe the parameters, basically. It'll then have "+
-            "a CSV and a YAML generated onto that basename.",
+            "a FASTA and a YAML generated onto that basename.",
         type=str)
     parser.add_argument("--number-lineages",help="The number of different "+
             "lineages to try to barcode.",
@@ -85,10 +85,6 @@ if __name__ == '__main__':
                 int(numpy.floor(numpy.random.uniform(0,args.number_lineages,1)))
                 }
             )
-
-    with open(args.outbase+".csv","w") as f:
-        for i in barcode_to_lineage:
-            f.write( list(i.keys())[0] +","+ str(list(i.values())[0]) +"\n" )
 
     with open(args.outbase+".yaml","w") as f:
         f.write(yaml.dump(barcode_to_lineage))

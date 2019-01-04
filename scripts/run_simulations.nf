@@ -20,13 +20,13 @@ run_parameters = Channel.from([
     ])
 
 process make_barcoded_libraries {
+    publishDIR "tmp", mode: "copy"
     input: 
         each script_make_degenerate_barcode_library_py
         each run_parameters
     output: 
-        set run_parameters, file("barcode_library.fasta"), 
-            file("barcode_library.yaml"), 
-            file("barcode_library.csv") into barcoded_libraries
+        set run_parameters, 
+            file("barcodeLibrary_$(run_parameters[0]}_${run_parameters[1]}lineages_${run_parameters[2]}clones.yaml"), file("barcodeLibrary_$(run_parameters[0]}_${run_parameters[1]}lineages_${run_parameters[2]}clones.fasta") into barcoded_libraries
     shell:
     '''
     python3 !{script_make_degenerate_barcode_library_py} !{run_parameters[0]} barcode_library
