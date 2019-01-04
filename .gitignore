@@ -1,2 +1,8 @@
 scripts/*_cache
 scripts/*_files
+.nextflow*
+work
+tmp
+*.swp
+codescraps
+ark
