@@ -241,15 +241,25 @@ process grinder {
 //    '''
 //}
 
-process bartender_extract_and_quant {
+process bartender_extract {
     input:
-        set params, file input_fastq from quantification_queue
+        set params, file input_fastq from sequencing_output 
     output:
-        set params, file("barcode_quant") into quantifications
+        set params, file("extracted_barcodes.txt") into bartender_extracted_codes 
     shell:
     '''
     bartender_extractor_com -f !{input_fastq} -o extracted -q ? \
         -p TACC[4-7]AA[4-7]AA[4-7]TT[4-7]ATAA -m 2
+    '''
+}
+
+process bartender_quant {
+    input:
+        set params, file input_barcode_csv from bartender_extracted_codes
+    output:
+        set params, file("barcode_quant") into quantifications
+    shell:
+    '''
     bartender_single_com -f extracted_barcode.txt \
         -o barcode_quant -d 3
     '''

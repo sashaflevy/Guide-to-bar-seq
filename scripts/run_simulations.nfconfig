@@ -24,7 +24,13 @@ process {
         container = "shub://darachm/singularity_grinder:latest"
     }
 
-    withName: bartender_extract_and_quant {
+    withName: bartender_extract {
+        cpus = "3"
+        memory = "4GB"
+        container = "shub://darachm/singularity_bartender:latest"
+    }
+
+    withName: bartender_quant {
         cpus = "3"
         memory = "4GB"
         container = "shub://darachm/singularity_bartender:latest"
