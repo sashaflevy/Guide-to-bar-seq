@@ -11,58 +11,48 @@ file("./reports").mkdirs()
 script_make_degenerate_barcode_library_py = Channel
     .fromPath("scripts/make_degenerate-barcode-library.py")
 
-// Run parameters. Schema, by position:
-//  1. barcode in IUPAC codes
-//  2. number of lineages 
-//  3. number of barcode clones (number of barcodes sampled)
-//  4. replicate id
-//  5. read depth
-//  6. errors after sequencing
-//  7. percentage of errors that are substitutions and indels
-//  8. chimera percentage
-//  9. abundance distribution
-run_parameters = Channel.from([
-    [ "ATCGNNNNCNNNNCNNNNCNNNNCNNNNATCG" , 100, 1000, "a", 10000, "uniform 0.1", "50 50", "10", "powerlaw 0.6" ],
-    [ "ATCGNNNNCNNNNCNNNNCNNNNCNNNNATCG" , 100, 1000, "a", 10000, "uniform 0.1", "50 50", "10", "powerlaw 0.3" ]
-    ])
+parameters = Channel.fromPath("scripts/parameters_simulations.csv")
+    .splitCsv(header: true)
 
 process make_barcoded_libraries {
     input: 
         each script_make_degenerate_barcode_library_py
-        each run_parameters
+        each parameters
     output: 
-        set run_parameters, 
-            file("barcodeLibrary_${run_parameters[0]}_${run_parameters[1]}lineages_${run_parameters[2]}clones_replicate${run_parameters[3]}.yaml"), 
-            file("barcodeLibrary_${run_parameters[0]}_${run_parameters[1]}lineages_${run_parameters[2]}clones_replicate${run_parameters[3]}.fasta") into barcoded_libraries
+        set val(parameters), file("barcode_library.yaml"), file("barcode_library.fasta") into barcoded_libraries
     shell:
     '''
     python3 !{script_make_degenerate_barcode_library_py} \
-        --number-lineages !{run_parameters[1]} \
-        --number-barcoded-clones !{run_parameters[2]} \
-        --replicate !{run_parameters[3]} \
-        !{run_parameters[0]} barcodeLibrary
+        --number-lineages !{parameters["num_lineages"]} \
+        --number-barcoded-clones !{parameters["num_barcoded_clones"]} \
+        --replicate !{parameters["replicate_id"]} \
+        !{parameters["barcode_pattern"]} barcodeLibrary
+    mv *yaml barcode_library.yaml
+    mv *fasta barcode_library.fasta
     '''
 }
 
 process grinder {
+    publishDir "tmp"
     input:
-        set run_parameters, file(yaml), file(fasta) from barcoded_libraries
+        set val(parameters), file(yaml), file(fasta) from barcoded_libraries
     output:
-        set run_parameters, file("grinder-reads.fastq"), 
+        set val(parameters), file("grinder-reads.fastq"), 
             file("grinder-ranks.txt") into grinder_output
     shell:
     '''
     grinder -reference_file !{fasta} \
-        -total_reads !{run_parameters[4]} \
+        -total_reads !{parameters["read_depth"]} \
         -read_dist 150 \
         -unidirectional 1 \
-        -mutation_dist !{run_parameters[5]} \
-        -mutation_ratio !{run_parameters[6]} \
-        -chimera_perc !{run_parameters[7]} \
-        -abundance_model !{run_parameters[8]} \
+        -mutation_dist !{parameters["error_rate"]} \
+        -mutation_ratio !{parameters["percentage_subs_indels"]} \
+        -chimera_perc !{parameters["chimera_percentage"]} \
+        -abundance_model !{parameters["abundance_distribution"]} \
         -random_seed 1234 \
-        -qual_levels 30 10 \
-        -fastq_output 1 &> errorz
+        -qual_levels 35 10 \
+        -fastq_output 1 \
+        -base_name grinder &> errorz
     '''
 }
 
@@ -250,3 +240,17 @@ process grinder {
 //        -fastq_output 1 &> errorz
 //    '''
 //}
+
+process bartender_extract_and_quant {
+    input:
+        set params, file input_fastq from quantification_queue
+    output:
+        set params, file("barcode_quant") into quantifications
+    shell:
+    '''
+    bartender_extractor_com -f !{input_fastq} -o extracted -q ? \
+        -p TACC[4-7]AA[4-7]AA[4-7]TT[4-7]ATAA -m 2
+    bartender_single_com -f extracted_barcode.txt \
+        -o barcode_quant -d 3
+    '''
+}
