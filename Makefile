@@ -6,7 +6,7 @@ testsim: ./scripts/nextflow scripts/run_simulations.nf scripts/run_simulations.n
 	$(word 1,$^) $(word 2,$^) -c $(word 3,$^) 
 
 simulations: ./scripts/nextflow scripts/run_simulations.nf scripts/run_simulations.nfconfig
-	$(word 1,$^) $(word 2,$^) -c $(word 3,$^)
+	$(word 1,$^) $(word 2,$^) -c $(word 3,$^) -resume
 
 # Here's a rule to just convert PDFs to PNGs for good sharing
 output/%.png: output/%.pdf
