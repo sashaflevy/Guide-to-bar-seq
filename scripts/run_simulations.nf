@@ -117,6 +117,6 @@ process bartender_eval {
         set parameters, file("bartender_deviations.csv") into bartender_deviations
     shell:
     '''
-    python3 !{script_eval_bartender_deviations} !{yaml} !{input_ranks} !{bartender_quant_cluster} !{bartender_quant_cluster} "!{parameters['barcode_pattern']}"
+    python3 !{script_eval_bartender_deviations} !{yaml} !{abundances} !{bartender_quant_cluster} !{bartender_quant_cluster} "!{parameters['barcode_pattern']}"
     '''
 }

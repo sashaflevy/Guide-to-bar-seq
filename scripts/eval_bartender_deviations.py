@@ -10,7 +10,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("yaml",help="orig yaml",type=str)
-    parser.add_argument("ranks",help="grinder ranks",type=str)
+    parser.add_argument("abundances",help="just raw abundances as each time it's observed in the sample",type=str)
     parser.add_argument("bartender_barcode",help="bartender barcode file",type=str)
     parser.add_argument("bartender_cluster",help="bartender cluster file",type=str)
     parser.add_argument("actual_barcode_pattern",help="the real barcode pattern because bartender is written in a way that obscures honest benchmarking",type=str)
@@ -22,12 +22,13 @@ if __name__ == '__main__':
             for key in i.keys():
                 orig_seq_to_id[key] = i[key]
 
-    grinder_ranks = dict()
-    with open(args.ranks,"r") as f:
-        library_ranks = csv.reader(f,delimiter="\t")
-        next(library_ranks)
-        for i in library_ranks:
-            grinder_ranks[i[1]] = i[2]
+    abundances = dict()
+    with open(args.abundances,"r") as f:
+        for i in f:
+            try:
+                abundances[i.strip()] += 1
+            except:
+                abundances[i.strip()] = 1
 
     clusterid_to_orig_seqs = dict()
     orig_seqs_to_clusterid = dict()
@@ -54,9 +55,9 @@ if __name__ == '__main__':
 
     for barcode, barcode_id in orig_seq_to_id.items():
         try:
-            grinder_ranks[str(barcode_id)]
+            abundances[str(barcode_id)]
         except:
-            grinder_ranks[str(barcode_id)] = 0
+            abundances[str(barcode_id)] = 0
             orig_seqs_to_clusterid[barcode] = "NA"
 
     print(orig_seqs_to_clusterid)
@@ -69,7 +70,7 @@ if __name__ == '__main__':
         print(barcode)
         print(barcode.upper())
         print(barcode_id)
-        print(grinder_ranks[str(barcode_id)])
+        print(abundances[str(barcode_id)])
         print(orig_seqs_to_clusterid[barcode.upper()])
         #print(clusterid_to_counts[orig_seqs_to_clusterid[barcode]])
 
