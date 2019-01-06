@@ -41,6 +41,11 @@ process {
         container = 'shub://darachm/slapchop:latest'
     }
 
+    withName: starcode {
+        cpus='3'
+        memory = "3GB"
+    }
+
 }
 
 // This stuff is defining the reports and things, so tracing the 

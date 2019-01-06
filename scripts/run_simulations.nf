@@ -21,7 +21,6 @@ parameters = Channel.fromPath("scripts/parameters_simulations.csv")
     .splitCsv(header: true)
 
 process make_barcoded_libraries {
-    publishDir "tmp"
     input: 
         each script_make_degenerate_barcode_library_py
         each parameters
@@ -40,7 +39,6 @@ process make_barcoded_libraries {
 }
 
 process sample_abundance_library {
-    publishDir "tmp"
     input: 
         each script_sample_yaml_as_fasta
         set val(parameters), file(barcode_yaml), file(barcode_fasta) from barcoded_libraries
@@ -53,7 +51,6 @@ process sample_abundance_library {
 }
 
 process grinder {
-    publishDir "tmp"
     input:
         set val(parameters), file(yaml), file(fasta), file(abundances) from sampled_libraries
     output:
@@ -78,44 +75,39 @@ process grinder {
 
 
 process slapchop {
-    publishDir "tmp"
     input:
         set val(parameters), file(yaml), file(abundances), file(grinder_fastq), 
             file(grinder_ranks) from grinder_output 
     output:
-        set val(parameters), file(yaml), file(abundances), file(grinder_reads), 
+        set val(parameters), file(yaml), file(abundances), file("basename_pass.fastq"), 
             file(grinder_ranks) into slapchoped_fastq 
     shell: 
-        '''
-    	python3 /slapchop.py !{grinder_fastq} basename \
-            --bite-size 10000 --processes !{task.cpus}    \
-            -o "GetLineageRead1: input > !{parameters["slapchop_pattern"]}" \
-            --output-seq "barcode" \
-            --output-id "input.id" \
-            --write-report \
-            --verbose \
-            --verbose \
-            --verbose \
-            --verbose > stdout
-        '''
+    '''
+	python3 /slapchop.py !{grinder_fastq} basename \
+        --bite-size 10000 --processes !{task.cpus}    \
+        -o "GetLineageRead1: input > !{parameters["slapchop_pattern"]}" \
+        --output-seq "barcode" \
+        --output-id "input.id" \
+        --verbose > stdout
+    '''
 }
 
-//process conform_slapchopd_fastqs { 
-//    publishDir "tmp", mode: 'copy'
-//    input: 
-//        set val(name), file("F_pass"), file("F_fail"), 
-//            file("R_pass"), file("R_fail") from slapchopd_fastq
-//        each file("fastq_conform.py") from fastq_conform
-//    output:
-//        set val(name), file({name+"_conformed_F_pass.fastq"}), 
-//            file({name+"_conformed_R_pass.fastq"}) into conformed_fastq
-//    shell:
-//        '''
-//        python3 fastq_conform.py F_pass R_pass --prefix !{name}_conformed_ --suffix .fastq
-//        '''
-//}
-
-
+process starcode {
+    input:
+        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+            file(grinder_ranks) from slapchoped_fastq 
+    output:
+        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+            file(grinder_ranks) into starcoded
+    shell:
+    '''
+    starcode --threads !{task.cpus} \
+        -d 3 --cluster-ratio 10 \
+        --input !{slapchop_pass} \
+        --print-clusters --seq-id \
+        --output starcoded
+    '''
+}
 
 //
 //tmp/sample%_clustered_lineage_tags.starclust: \
@@ -158,27 +150,27 @@ process slapchop {
 //        '''
 //}
 
- // Special trigger for `onComplete`. I copied this from documentation.
- // Some predefined variables. It somehow mails it. Cool.
-workflow.onComplete {
-    println "Pipeline completed at: $workflow.complete"
-    println "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
-
-    def subject = 'barnone run'
-    def recipient = email_address
-
-    ['mail', '-s', subject, recipient].execute() << """
-
-    Pipeline execution summary
-    ---------------------------
-    Completed at: ${workflow.complete}
-    Duration        : ${workflow.duration}
-    Success         : ${workflow.success}
-    workDir         : ${workflow.workDir}
-    exit status : ${workflow.exitStatus}
-    Error report: ${workflow.errorReport ?: '-'}
-    """
-}
+// // Special trigger for `onComplete`. I copied this from documentation.
+// // Some predefined variables. It somehow mails it. Cool.
+//workflow.onComplete {
+//    println "Pipeline completed at: $workflow.complete"
+//    println "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
+//
+//    def subject = 'barnone run'
+//    def recipient = email_address
+//
+//    ['mail', '-s', subject, recipient].execute() << """
+//
+//    Pipeline execution summary
+//    ---------------------------
+//    Completed at: ${workflow.complete}
+//    Duration        : ${workflow.duration}
+//    Success         : ${workflow.success}
+//    workDir         : ${workflow.workDir}
+//    exit status : ${workflow.exitStatus}
+//    Error report: ${workflow.errorReport ?: '-'}
+//    """
+//}
 
 
 //process bartender_extract {

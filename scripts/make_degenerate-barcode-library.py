@@ -75,9 +75,10 @@ if __name__ == '__main__':
     barcode_to_lineage = list()
 
     for i in range(args.number_barcoded_clones):
+        this_barcode = randBarcode(args.pattern)
         barcode_to_lineage.append(
-            {   randBarcode(args.pattern):
-                int(numpy.floor(numpy.random.uniform(0,args.number_lineages,1)))
+            {   this_barcode:
+                str(int(numpy.floor(numpy.random.uniform(0,args.number_lineages,1))))+"_"+this_barcode
                 }
             )
 
@@ -86,6 +87,6 @@ if __name__ == '__main__':
 
     with open(baseNameOut+".fasta","w") as f:
         for i in barcode_to_lineage:
-            f.write( "> "+ str(list(i.values())[0])+"_"+list(i.keys())[0]+"\n"+ list(i.keys())[0] +"\n")
+            f.write( "> "+ str(list(i.values())[0])+"\n"+ list(i.keys())[0] +"\n")
 
 
