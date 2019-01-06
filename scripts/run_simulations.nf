@@ -11,10 +11,14 @@ file("./reports").mkdirs()
 script_make_degenerate_barcode_library_py = Channel
     .fromPath("scripts/make_degenerate-barcode-library.py")
 
+script_eval_bartender_deviations = Channel
+    .fromPath("scripts/eval_bartender_deviations.py")
+
 parameters = Channel.fromPath("scripts/parameters_simulations.csv")
     .splitCsv(header: true)
 
 process make_barcoded_libraries {
+    publishDir "tmp"
     input: 
         each script_make_degenerate_barcode_library_py
         each parameters
@@ -37,8 +41,8 @@ process grinder {
     input:
         set val(parameters), file(yaml), file(fasta) from barcoded_libraries
     output:
-        set val(parameters), file("grinder-reads.fastq"), 
-            file("grinder-ranks.txt") into grinder_output
+        set val(parameters), file(yaml), file("grinder-reads.fastq"), 
+            file("grinder-counts.txt") into grinder_output 
     shell:
     '''
     grinder -reference_file !{fasta} \
@@ -53,6 +57,7 @@ process grinder {
         -qual_levels 35 10 \
         -fastq_output 1 \
         -base_name grinder &> errorz
+    
     '''
 }
 
@@ -242,25 +247,46 @@ process grinder {
 //}
 
 process bartender_extract {
+    publishDir "tmp"
     input:
-        set params, file input_fastq from sequencing_output 
+        set parameters, file(yaml), file(input_fastq), file(input_ranks) from grinder_output 
     output:
-        set params, file("extracted_barcodes.txt") into bartender_extracted_codes 
+        set parameters, file(yaml), file(input_ranks), file("extracted_barcode.txt") into bartender_extracted_codes 
     shell:
     '''
     bartender_extractor_com -f !{input_fastq} -o extracted -q ? \
-        -p TACC[4-7]AA[4-7]AA[4-7]TT[4-7]ATAA -m 2
+        -p !{parameters["bartender_pattern"]} -m 2
     '''
 }
 
 process bartender_quant {
+    publishDir "tmp"
     input:
-        set params, file input_barcode_csv from bartender_extracted_codes
+        set parameters, file(yaml), file(input_ranks), file(extracted_barcodes) from bartender_extracted_codes 
     output:
-        set params, file("barcode_quant") into quantifications
+        set parameters, file(yaml), file(input_ranks),
+            file("barcode_quant_barcode.csv"),
+            file("barcode_quant_cluster.csv"),
+            file("barcode_quant_quality.csv") into bartender_quantifications
     shell:
     '''
-    bartender_single_com -f extracted_barcode.txt \
+    bartender_single_com -f !{extracted_barcodes} \
         -o barcode_quant -d 3
+    '''
+}
+
+process bartender_quant {
+    publishDir "tmp"
+    input:
+        set parameters, file(yaml), file(input_ranks),
+            file(bartender_quant_barcode),
+            file(bartender_quant_cluster),
+            file(bartender_quant_quality) from bartender_quantifications
+        each script_eval_bartender_deviations
+    output:
+        set parameters, file("bartender_deviations.csv") into bartender_deviations
+    shell:
+    '''
+    python3 !{script_eval_bartender_deviations} !{yaml} !{input_ranks} !{bartender_quant_cluster} !{bartender_quant_cluster} "!{parameters['barcode_pattern']}"
     '''
 }
