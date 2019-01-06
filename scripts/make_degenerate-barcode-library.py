@@ -86,6 +86,6 @@ if __name__ == '__main__':
 
     with open(baseNameOut+".fasta","w") as f:
         for i in barcode_to_lineage:
-            f.write( "> "+ str(list(i.values())[0]) +"\n"+ list(i.keys())[0] +"\n")
+            f.write( "> "+ str(list(i.values())[0])+"_"+list(i.keys())[0]+"\n"+ list(i.keys())[0] +"\n")
 
 
