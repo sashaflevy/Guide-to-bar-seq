@@ -17,6 +17,12 @@ script_sample_yaml_as_fasta = Channel
 script_eval_bartender_deviations = Channel
     .fromPath("scripts/eval_bartender_deviations.py")
 
+script_eval_starcoded = Channel
+    .fromPath("scripts/eval_starcode.py")
+
+script_plot_starcode = Channel
+    .fromPath("scripts/plot_eval.R")
+
 parameters = Channel.fromPath("scripts/parameters_simulations.csv")
     .splitCsv(header: true)
 
@@ -43,10 +49,11 @@ process sample_abundance_library {
         each script_sample_yaml_as_fasta
         set val(parameters), file(barcode_yaml), file(barcode_fasta) from barcoded_libraries
     output: 
-        set val(parameters), file(barcode_yaml), file("barcode_library.fasta"), file("abundances.txt") into sampled_libraries
+        set val(parameters), file(barcode_yaml), file("barcode_library.fasta"), file("counted_abundances.txt") into sampled_libraries
     shell:
     '''
     python3 !{script_sample_yaml_as_fasta} !{barcode_yaml} !{parameters["cell_sample_size"]} barcode_library.fasta abundances.txt
+    cat abundances.txt | sort | uniq -c > counted_abundances.txt
     '''
 }
 
@@ -98,7 +105,7 @@ process starcode {
             file(grinder_ranks) from slapchoped_fastq 
     output:
         set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
-            file(grinder_ranks) into starcoded
+            file(grinder_ranks), file("starcoded") into starcoded
     shell:
     '''
     starcode --threads !{task.cpus} \
@@ -106,6 +113,36 @@ process starcode {
         --input !{slapchop_pass} \
         --print-clusters --seq-id \
         --output starcoded
+    '''
+}
+
+process eval_starcode {
+    input:
+        each script_eval_starcoded
+        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+            file(grinder_ranks), file(starcoded) from starcoded
+    output:
+        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+            file(grinder_ranks), file(starcoded), 
+            file("eval_starcoded.txt") into eval_starcoded
+    shell:
+    '''
+    python3 !{script_eval_starcoded} !{abundances} !{starcoded} eval_starcoded.txt
+    '''
+}
+
+process plot_starcode {
+    publishDir "tmp"
+    input:
+        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+            file(grinder_ranks), file(starcoded), 
+            file(eval_starcoded) from eval_starcoded
+        each script_plot_starcode
+    output:
+        set file("var_per_clone.png"), file("var_per_code.png") into output
+    shell:
+    '''
+    Rscript !{script_plot_starcode}
     '''
 }
 
@@ -178,7 +215,7 @@ process starcode {
 //    input:
 //        set parameters, file(yaml), file(abundances), file(input_fastq), file(input_ranks) from grinder_output 
 //    output:
-//        set parameters, file(yaml), file(abundances), file(input_ranks), file("extracted_barcode.txt") into bartender_extracted_codes 
+//        set parameters, file(yaml), file(abundances), file(input_ranks), file("extracted_barcode.tsv") into bartender_extracted_codes 
 //    shell:
 //    '''
 //    bartender_extractor_com -f !{input_fastq} -o extracted -q ? \

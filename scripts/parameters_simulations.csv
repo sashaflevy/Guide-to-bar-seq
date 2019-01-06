@@ -1,3 +1,3 @@
 barcode_pattern,bartender_pattern,slapchop_pattern,replicate_id,num_lineages,num_barcoded_clones,cell_sample_size,read_depth,error_rate,percentage_subs_indels,chimera_percentage,abundance_distribution
-ATCGNNNNCNNNNCNNNNCNNNNCNNNNATCG,ATCG[4]C[4]C[4]C[4]C[4]ATCG,(?P<barcode>ATCG[ATCG]{4}C[ATCG]{4}C[ATCG]{4}C[ATCG]{4}C[ATCG]{4}ATCG){e<=3},a,100,1000,10000,10000,uniform0.1,50 50,10,uniform
-ATCGNNNNCNNNNCNNNNCNNNNCNNNNATCG,ATCG[4]C[4]C[4]C[4]C[4]ATCG,(?P<barcode>ATCG[ATCG]{4}C[ATCG]{4}C[ATCG]{4}C[ATCG]{4}C[ATCG]{4}ATCG){e<=3},b,100,1000,10000,10000,uniform0.1,50 50,10,uniform
+ATCGNNNNCNNNNCNNNNCNNNNCNNNNATCG,ATCG[4]C[4]C[4]C[4]C[4]ATCG,(?P<barcode>ATCG[ATCG]{4}C[ATCG]{4}C[ATCG]{4}C[ATCG]{4}C[ATCG]{4}ATCG){e<=3},a,100,1000,10000,100000,uniform0.1,50 50,10,uniform
+ATCGNNNNCNNNNCNNNNCNNNNCNNNNATCG,ATCG[4]C[4]C[4]C[4]C[4]ATCG,(?P<barcode>ATCG[ATCG]{4}C[ATCG]{4}C[ATCG]{4}C[ATCG]{4}C[ATCG]{4}ATCG){e<=3},b,100,1000,10000,100000,uniform0.1,50 50,10,uniform
