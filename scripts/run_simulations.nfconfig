@@ -36,6 +36,11 @@ process {
         container = "shub://darachm/singularity_bartender:latest"
     }
 
+    withName: slapchop {
+        cpus='6'
+        container = 'shub://darachm/slapchop:latest'
+    }
+
 }
 
 // This stuff is defining the reports and things, so tracing the 

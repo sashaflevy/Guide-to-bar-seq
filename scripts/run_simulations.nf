@@ -26,7 +26,9 @@ process make_barcoded_libraries {
         each script_make_degenerate_barcode_library_py
         each parameters
     output: 
-        set val(parameters), file("barcode_library.yaml"), file("barcode_library.fasta") into barcoded_libraries
+        set val(parameters), 
+            file({"barcodeLibrary_"+parameters['barcode_pattern']+"_"+parameters['num_lineages']+"lineages_"+parameters['num_barcoded_clones']+"clones_replicate"+parameters['replicate_id']+".yaml"}),
+            file({"barcodeLibrary_"+parameters['barcode_pattern']+"_"+parameters['num_lineages']+"lineages_"+parameters['num_barcoded_clones']+"clones_replicate"+parameters['replicate_id']+".fasta"}) into barcoded_libraries
     shell:
     '''
     python3 !{script_make_degenerate_barcode_library_py} \
@@ -34,8 +36,6 @@ process make_barcoded_libraries {
         --number-barcoded-clones !{parameters["num_barcoded_clones"]} \
         --replicate !{parameters["replicate_id"]} \
         !{parameters["barcode_pattern"]} barcodeLibrary
-    mv *yaml barcode_library.yaml
-    mv *fasta barcode_library.fasta
     '''
 }
 
@@ -76,47 +76,152 @@ process grinder {
     '''
 }
 
-process bartender_extract {
+
+process slapchop {
     publishDir "tmp"
     input:
-        set parameters, file(yaml), file(abundances), file(input_fastq), file(input_ranks) from grinder_output 
+        set val(parameters), file(yaml), file(abundances), file(grinder_fastq), 
+            file(grinder_ranks) from grinder_output 
     output:
-        set parameters, file(yaml), file(abundances), file(input_ranks), file("extracted_barcode.txt") into bartender_extracted_codes 
-    shell:
-    '''
-    bartender_extractor_com -f !{input_fastq} -o extracted -q ? \
-        -p !{parameters["bartender_pattern"]} -m 2
-    '''
+        set val(parameters), file(yaml), file(abundances), file(grinder_reads), 
+            file(grinder_ranks) into slapchoped_fastq 
+    shell: 
+        '''
+    	python3 /slapchop.py !{grinder_fastq} basename \
+            --bite-size 10000 --processes !{task.cpus}    \
+            -o "GetLineageRead1: input > !{parameters["slapchop_pattern"]}" \
+            --output-seq "barcode" \
+            --output-id "input.id" \
+            --write-report \
+            --verbose \
+            --verbose \
+            --verbose \
+            --verbose > stdout
+        '''
 }
 
-process bartender_quant {
-    publishDir "tmp"
-    input:
-        set parameters, file(yaml), file(abundances), file(input_ranks), file(extracted_barcodes) from bartender_extracted_codes 
-    output:
-        set parameters, file(yaml), file(abundances), file(input_ranks),
-            file("barcode_quant_barcode.csv"),
-            file("barcode_quant_cluster.csv"),
-            file("barcode_quant_quality.csv") into bartender_quantifications
-    shell:
-    '''
-    bartender_single_com -f !{extracted_barcodes} \
-        -o barcode_quant -d 3
-    '''
+//process conform_slapchopd_fastqs { 
+//    publishDir "tmp", mode: 'copy'
+//    input: 
+//        set val(name), file("F_pass"), file("F_fail"), 
+//            file("R_pass"), file("R_fail") from slapchopd_fastq
+//        each file("fastq_conform.py") from fastq_conform
+//    output:
+//        set val(name), file({name+"_conformed_F_pass.fastq"}), 
+//            file({name+"_conformed_R_pass.fastq"}) into conformed_fastq
+//    shell:
+//        '''
+//        python3 fastq_conform.py F_pass R_pass --prefix !{name}_conformed_ --suffix .fastq
+//        '''
+//}
+
+
+
+//
+//tmp/sample%_clustered_lineage_tags.starclust: \
+//	tmp/sample%_lineageF_pass.fastq.conformed tmp/sample%_lineageR_pass.fastq.conformed
+//	-starcode \
+//		-1 $(word 1,$^) -2 $(word 2,$^) \
+//		-s \
+//		-t 3 --print-clusters > $@
+//
+//tmp/sample%_clustered_lineage_tags.counts: \
+//	tmp/sample%_clustered_lineage_tags.starclust
+//	gawk '{print $3}' $< | sort -rg | uniq -c > $@
+//
+//
+//process label_counts {
+//    input:
+//        set MM, file(this_counts_file) from results
+//    output:
+//        file "labeled_counts.tsv" into labeled_results
+//    shell: 
+//        '''
+//        cat !{this_counts_file} | sed "s/^/!{MM}MM_/" > labeled_counts.tsv
+//        '''
+//}
+//
+//process concat_counts {
+//    publishDir "tmp", mode: 'copy'
+//    input:
+//        file 'labeled_counts_list' from labeled_results.collect()
+//    output:
+//        file "all_counts.tsv"
+//    shell: 
+//        '''
+//        head -n 1 labeled_counts_list1 | \
+//            sed 's/^[0-9]*MM_//' | sed 's/Strain/Observation/' \
+//            > all_counts.tsv
+//        for i in $(ls labeled_counts_list*)
+//            do cat ${i} | tail -n+2 >> all_counts.tsv
+//        done
+//        '''
+//}
+
+ // Special trigger for `onComplete`. I copied this from documentation.
+ // Some predefined variables. It somehow mails it. Cool.
+workflow.onComplete {
+    println "Pipeline completed at: $workflow.complete"
+    println "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
+
+    def subject = 'barnone run'
+    def recipient = email_address
+
+    ['mail', '-s', subject, recipient].execute() << """
+
+    Pipeline execution summary
+    ---------------------------
+    Completed at: ${workflow.complete}
+    Duration        : ${workflow.duration}
+    Success         : ${workflow.success}
+    workDir         : ${workflow.workDir}
+    exit status : ${workflow.exitStatus}
+    Error report: ${workflow.errorReport ?: '-'}
+    """
 }
 
-process bartender_eval {
-    publishDir "tmp"
-    input:
-        set parameters, file(yaml), file(abundances), file(input_ranks),
-            file(bartender_quant_barcode),
-            file(bartender_quant_cluster),
-            file(bartender_quant_quality) from bartender_quantifications
-        each script_eval_bartender_deviations
-    output:
-        set parameters, file("bartender_deviations.csv") into bartender_deviations
-    shell:
-    '''
-    python3 !{script_eval_bartender_deviations} !{yaml} !{abundances} !{bartender_quant_cluster} !{bartender_quant_cluster} "!{parameters['barcode_pattern']}"
-    '''
-}
+
+//process bartender_extract {
+//    publishDir "tmp"
+//    input:
+//        set parameters, file(yaml), file(abundances), file(input_fastq), file(input_ranks) from grinder_output 
+//    output:
+//        set parameters, file(yaml), file(abundances), file(input_ranks), file("extracted_barcode.txt") into bartender_extracted_codes 
+//    shell:
+//    '''
+//    bartender_extractor_com -f !{input_fastq} -o extracted -q ? \
+//        -p !{parameters["bartender_pattern"]} -m 2
+//    '''
+//}
+//
+//process bartender_quant {
+//    publishDir "tmp"
+//    input:
+//        set parameters, file(yaml), file(abundances), file(input_ranks), file(extracted_barcodes) from bartender_extracted_codes 
+//    output:
+//        set parameters, file(yaml), file(abundances), file(input_ranks),
+//            file("barcode_quant_barcode.csv"),
+//            file("barcode_quant_cluster.csv"),
+//            file("barcode_quant_quality.csv") into bartender_quantifications
+//    shell:
+//    '''
+//    bartender_single_com -f !{extracted_barcodes} \
+//        -o barcode_quant -d 3
+//    '''
+//}
+//
+//process bartender_eval {
+//    publishDir "tmp"
+//    input:
+//        set parameters, file(yaml), file(abundances), file(input_ranks),
+//            file(bartender_quant_barcode),
+//            file(bartender_quant_cluster),
+//            file(bartender_quant_quality) from bartender_quantifications
+//        each script_eval_bartender_deviations
+//    output:
+//        set parameters, file("bartender_deviations.csv") into bartender_deviations
+//    shell:
+//    '''
+//    python3 !{script_eval_bartender_deviations} !{yaml} !{abundances} !{bartender_quant_cluster} !{bartender_quant_cluster} "!{parameters['barcode_pattern']}"
+//    '''
+//}
