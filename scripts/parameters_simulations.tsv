@@ -1,0 +1,5 @@
+barcode_pattern	bartender_pattern	slapchop_pattern	replicate_id	num_lineages	num_barcoded_clones	cell_sample_size	read_depth	error_rate	percentage_subs_indels	chimera_percentage	abundance_distribution
+ATCGNNNNNNATCG	ATCGNNNNNNATCG	(?P<barcode>ATCG[ATCG]{5,7}ATCG){e<=2}	a	10	100	1000	100000	uniform0.0	80 20	00	uniform
+ATCGNNNNNNATCG	ATCGNNNNNNATCG	(?P<barcode>ATCG[ATCG]{5,7}ATCG){e<=2}	a	10	10	1000	100000	uniform0.0	80 20	00	uniform
+ATCGNNNNNNATCG	ATCGNNNNNNATCG	(?P<barcode>ATCG[ATCG]{5,7}ATCG){e<=2}	a	10	50	1000	100000	uniform0.0	80 20	00	uniform
+ATCGNNNNNNATCG	ATCGNNNNNNATCG	(?P<barcode>ATCG[ATCG]{5,7}ATCG){e<=2}	a	10	100	100	100000	uniform0.0	80 20	00	uniform

@@ -23,8 +23,8 @@ script_eval_starcoded = Channel
 script_plot_starcode = Channel
     .fromPath("scripts/plot_eval.R")
 
-parameters = Channel.fromPath("scripts/parameters_simulations.csv")
-    .splitCsv(header: true)
+parameters = Channel.fromPath("scripts/parameters_simulations.tsv")
+    .splitCsv(header: true, strip: true, sep: "\t")
 
 process make_barcoded_libraries {
     input: 
@@ -139,10 +139,13 @@ process plot_starcode {
             file(eval_starcoded) from eval_starcoded
         each script_plot_starcode
     output:
-        set file("var_per_clone.png"), file("var_per_code.png") into output
+        set file({"var_"+parameters['barcode_pattern']+"_"+parameters['num_lineages']+"lineages_"+parameters['num_barcoded_clones']+"clones_replicate"+parameters['replicate_id']+"_per_clone.png"}),
+            file({"var_"+parameters['barcode_pattern']+"_"+parameters['num_lineages']+"lineages_"+parameters['num_barcoded_clones']+"clones_replicate"+parameters['replicate_id']+"_per_code.png"}) into output
     shell:
     '''
     Rscript !{script_plot_starcode}
+    mv var_per_code.png var_!{parameters['barcode_pattern']}_!{parameters['num_lineages']}lineages_!{parameters['num_barcoded_clones']}clones_replicate!{parameters['replicate_id']}_per_code.png
+    mv var_per_clone.png var_!{parameters['barcode_pattern']}_!{parameters['num_lineages']}lineages_!{parameters['num_barcoded_clones']}clones_replicate!{parameters['replicate_id']}_per_clone.png
     '''
 }
 
