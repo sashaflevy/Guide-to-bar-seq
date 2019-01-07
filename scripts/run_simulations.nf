@@ -23,6 +23,9 @@ script_eval_starcoded = Channel
 script_plot_starcode = Channel
     .fromPath("scripts/plot_eval.R")
 
+script_graph_barcode_library_py = Channel
+    .fromPath("scripts/graph_barcode_library.py")
+
 parameters = Channel.fromPath("scripts/parameters_simulations.tsv")
     .splitCsv(header: true, strip: true, sep: "\t")
 
@@ -44,10 +47,27 @@ process make_barcoded_libraries {
     '''
 }
 
+( barcoded_libraries_graph, barcoded_libraries_sim) = barcoded_libraries.into(2)
+
+process measure_barcode_distances {
+    publishDir "tmp"
+    input: 
+        each script_graph_barcode_library_py
+        set val(parameters), file(barcode_yaml), file(barcode_fasta) from barcoded_libraries_graph
+    output:
+        set file("barcode_graph.tsv"), file("barcode_graph.graph") into barcode_graph
+    shell:
+    '''
+    python3 !{script_graph_barcode_library_py} \
+        --store-graph --yaml \
+        !{barcode_yaml} barcode_graph
+    '''
+}
+
 process sample_abundance_library {
     input: 
         each script_sample_yaml_as_fasta
-        set val(parameters), file(barcode_yaml), file(barcode_fasta) from barcoded_libraries
+        set val(parameters), file(barcode_yaml), file(barcode_fasta) from barcoded_libraries_sim
     output: 
         set val(parameters), file(barcode_yaml), file("barcode_library.fasta"), file("counted_abundances.txt") into sampled_libraries
     shell:
