@@ -14,20 +14,51 @@ complement_dictionary = {
     }
 
 
+iupac_dictionary = {
+    "N": ["A","T","C","G"],
+    "R": ["A", "G"],
+    "Y": ["C", "T"],
+    "S": ["G", "C"],
+    "W": ["A", "T"],
+    "K": ["G", "T"],
+    "M": ["A", "C"],
+    "B": ["C", "G", "T"],
+    "D": ["A", "G", "T"],
+    "H": ["A", "C", "T"],
+    "V": ["A", "C", "G"]
+    }
+
+
 # recycling code from that SoBaSeq optimization business
 # this returns a random base
 # TODO should reimplement as being a list of letters to return and relative 
 # frequencies, just so it plays nice for testing informative nature of biased
 # base mixing. Should take that in as a base_mix dictionary.
-def randBase():
-    return str(["a","c","t","g"][int(numpy.floor(numpy.random.uniform(0,4,1)))])
+def randBase(possible=iupac_dictionary["N"],
+        mixing_dict={ "A": 0.25, "T": 0.25, "C": 0.25, "G": 0.25}
+        ):
+    subset_mixing = [ [], [] ]
+    for i in possible:
+        subset_mixing[0].append(i)
+        subset_mixing[1].append(mixing_dict[i])
+    subset_mixing[1] = subset_mixing[1] / numpy.sum(subset_mixing[1])
+    return str(numpy.random.choice(
+                subset_mixing[0],size=1,p=subset_mixing[1]
+                )[0] 
+            )
 
 
 # This takes a pattern, and replaces every "N" in there with one of 4 bases.
 # TODO implement passing the base_mix dictionary through to the randBase().
-def randBarcode(pattern):
-    for i in range(re.subn("N","N",pattern)[1]):
-        pattern = re.sub("N",randBase(),pattern,count=1)
+def randBarcode(pattern, 
+        mixing_dict={ "A": 0.25, "T": 0.25, "C": 0.25, "G": 0.25}
+        ) :
+    for each_code in iupac_dictionary.keys():
+        for i in range(re.subn(each_code,each_code,pattern)[1]):
+            pattern = re.sub(each_code,
+                randBase(iupac_dictionary[each_code],mixing_dict),
+                pattern,count=1
+                )
     return(pattern)
 
 
@@ -41,7 +72,10 @@ if __name__ == '__main__':
             "IUPAC codes. So, this can be the full construct.",
         type=str)
     parser.add_argument("--mix",help="The nucelotide mix of A,T,C,G in the "+
-            "barcodes. The script normalizes these to unity.",
+            "barcodes. The script normalizes these to unity. For clarity's "+
+            "sake, there's no option to alter the mix of individual "+
+            "positions, except for just using other IUPAC codes in the "+
+            "pattern.",
         type=str,default="0.25,0.25,0.25,0.25")
     parser.add_argument("--number-lineages",help="The number of different "+
             "lineages to try to barcode, so clones or genotypes barcoded with "+
@@ -77,13 +111,16 @@ if __name__ == '__main__':
 
     barcode_to_lineage = list()
 
+    mix_num = numpy.array( [float(i) for i in re.split(",",args.mix)] )
+    mixing_dict = dict(zip( ["A","T","C","G"], mix_num ))
+
     for i in range(args.number_lineages):
         if args.fixed_barcodes_per_clone:
             number_of_barcodes = int(args.barcodes_per_lineage)
         else:
             number_of_barcodes = int(numpy.floor(numpy.random.poisson(args.barcodes_per_lineage,1)))
         for j in range(number_of_barcodes):
-            this_barcode = randBarcode(args.pattern)
+            this_barcode = randBarcode(args.pattern,mixing_dict=mixing_dict)
             barcode_to_lineage.append( [ this_barcode, i ] )
 
     with open(baseNameOut+".fasta","w") as f:
