@@ -35,15 +35,17 @@ process make_barcoded_libraries {
         each parameters
     output: 
         set val(parameters), 
-            file({"barcodeLibrary_"+parameters['barcode_pattern']+"_"+parameters['num_lineages']+"lineages_"+parameters['num_barcoded_clones']+"clones_replicate"+parameters['replicate_id']+".yaml"}),
-            file({"barcodeLibrary_"+parameters['barcode_pattern']+"_"+parameters['num_lineages']+"lineages_"+parameters['num_barcoded_clones']+"clones_replicate"+parameters['replicate_id']+".fasta"}) into barcoded_libraries
+            file({"barcodeLibrary_"+parameters["barcode_pattern"]+"_"+parameters["base_mix"].replaceAll(/,/,"-")+"_"+parameters["num_lineages"]+"lineages_"+parameters["num_barcodes_per"]+"barcodesper_fixedBarcodesPer"+parameters["fixed_barcodes"]+"_replicate"+parameters["replicate_id"]+".fasta"}) into barcoded_libraries
     shell:
     '''
     python3 !{script_make_degenerate_barcode_library_py} \
+        !{parameters["barcode_pattern"]} \
+        --mix !{parameters["base_mix"]} \
         --number-lineages !{parameters["num_lineages"]} \
-        --number-barcoded-clones !{parameters["num_barcoded_clones"]} \
+        --barcodes-per-lineage !{parameters["num_barcodes_per"]} \
+        --fixed-barcodes-per-clone !{parameters["fixed_barcodes"]} \
         --replicate !{parameters["replicate_id"]} \
-        !{parameters["barcode_pattern"]} barcodeLibrary
+        barcodeLibrary
     '''
 }
 

@@ -37,24 +37,27 @@ iupac_dictionary = {
 def randBase(possible=iupac_dictionary["N"],
         mixing_dict={ "A": 0.25, "T": 0.25, "C": 0.25, "G": 0.25}
         ):
-    subset_mixing = [ [], [] ]
+    # Initializes two arrays, then subsets out only the nucleotides used
+    ( letters, proportions) = ( [], [] )
     for i in possible:
-        subset_mixing[0].append(i)
-        subset_mixing[1].append(mixing_dict[i])
-    subset_mixing[1] = subset_mixing[1] / numpy.sum(subset_mixing[1])
-    return str(numpy.random.choice(
-                subset_mixing[0],size=1,p=subset_mixing[1]
-                )[0] 
-            )
+        letters.append(i)
+        proportions.append(mixing_dict[i])
+    # Normalized to 1
+    proportions = proportions / numpy.sum(proportions)
+    # Picks a letter using these proportions
+    return str(numpy.random.choice(letters,size=1,p=proportions)[0])
 
 
-# This takes a pattern, and replaces every "N" in there with one of 4 bases.
-# TODO implement passing the base_mix dictionary through to the randBase().
+# This takes a pattern, and replaces every "IUPAC code" in there with one of
+# the appropriate bases, using the mixing dictionary of proportions
 def randBarcode(pattern, 
         mixing_dict={ "A": 0.25, "T": 0.25, "C": 0.25, "G": 0.25}
         ) :
+    # For each code in the dictionary, go looking for it
     for each_code in iupac_dictionary.keys():
+        # For each time we find it
         for i in range(re.subn(each_code,each_code,pattern)[1]):
+            # Sub it out with a random base of the appropriate type!
             pattern = re.sub(each_code,
                 randBase(iupac_dictionary[each_code],mixing_dict),
                 pattern,count=1
@@ -69,7 +72,7 @@ if __name__ == '__main__':
             "1 to 1 mapping or sampling barcodes for each lineage clone."
         )
     parser.add_argument("pattern",help="Pattern of the barcode, specified in "+
-            "IUPAC codes. So, this can be the full construct.",
+            "IUPAC codes. So, this can be the full construct if you want.",
         type=str)
     parser.add_argument("--mix",help="The nucelotide mix of A,T,C,G in the "+
             "barcodes. The script normalizes these to unity. For clarity's "+
@@ -89,7 +92,7 @@ if __name__ == '__main__':
             "mode where a clone gets a fixed number of barcodes (above). "+
             "Otherwise, it gets a poisson distribution of barcodes with mean "+
             "as the number of barcodes-per-lineage.",
-        action="store_true")
+        type=bool)
     parser.add_argument("outbase",help="The base filename to write out to. "+
             "This should describe the parameters, basically. It'll then have "+
             "a FASTA generated onto that basename. The ID is the lineage ID, "+
