@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-# using
 import argparse
 import yaml
 import re
@@ -32,61 +31,63 @@ def randBarcode(pattern):
     return(pattern)
 
 
-# Probably won't need this one
-## takes a string, mutates those bases based on a lambda
-#def mutator(x,mutations=0):
-#    numberToMutate = numpy.random.poisson(lam=mutations)
-#    positionsToMutate = numpy.floor(numpy.random.uniform(0,len(x),numberToMutate))
-#    outputString = list(x)
-#    if len(outputString) == 0:
-#        return ""
-#    for eachMutation in positionsToMutate:
-#        outputString[int(eachMutation)] = randBase()
-#    return "".join(outputString)
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="This is going to make a "+
-            "degenerate barcode library file, so each barcode and the lineage "+
-            "name that it maps to.")
+            "degenerate barcode library, then associate that with lineages by "+
+            "1 to 1 mapping or sampling barcodes for each lineage clone."
+        )
     parser.add_argument("pattern",help="Pattern of the barcode, specified in "+
             "IUPAC codes. So, this can be the full construct.",
         type=str)
+    parser.add_argument("--mix",help="The nucelotide mix of A,T,C,G in the "+
+            "barcodes. The script normalizes these to unity.",
+        type=str,default="0.25,0.25,0.25,0.25")
+    parser.add_argument("--number-lineages",help="The number of different "+
+            "lineages to try to barcode, so clones or genotypes barcoded with "+
+            "a clone.",
+        default=100, type=int)
+    parser.add_argument("--barcodes-per-lineage",help="Barcodes per each "+
+            "lineage Essentially, the number of barcodes in the library is "+
+            "the product of this and the number of lineages.",
+        default=3, type=float)
+    parser.add_argument("--fixed-barcodes-per-clone",help="This turns on the "+
+            "mode where a clone gets a fixed number of barcodes (above). "+
+            "Otherwise, it gets a poisson distribution of barcodes with mean "+
+            "as the number of barcodes-per-lineage.",
+        action="store_true")
     parser.add_argument("outbase",help="The base filename to write out to. "+
             "This should describe the parameters, basically. It'll then have "+
-            "a FASTA and a YAML generated onto that basename.",
+            "a FASTA generated onto that basename. The ID is the lineage ID, "+
+            "then it's the barcode.",
         type=str)
-    parser.add_argument("--number-lineages",help="The number of different "+
-            "lineages to try to barcode.",
-        default=100, type=int)
-    parser.add_argument("--number-barcoded-clones",help="Essentially, the "+
-            "number of barcodes in the library. This is probably going to be "+
-            "larger than the number of lineages",
-        default=1000, type=int)
     parser.add_argument("--replicate",help="A replicate ID to prevent "+
-            "filename collisions.",
+            "filename collisions, this is just tacked onto the end.",
         default="", type=str)
     args = parser.parse_args()
 
-    baseNameOut = args.outbase+"_"+args.pattern+"_"+str(args.number_lineages)+"lineages_"+str(args.number_barcoded_clones)+"clones_replicate"+args.replicate
+    baseNameOut = (
+        args.outbase+"_"+args.pattern+"_"+
+            re.sub(",","-",args.mix)+"_"+str(args.number_lineages)+"lineages_"+
+            str(args.barcodes_per_lineage)+"barcodesper_fixedBarcodesPer"+
+            str(args.fixed_barcodes_per_clone)+"_replicate"+args.replicate
+        )
 
+    print("Printing this out to : "+baseNameOut)
 
     barcode_to_lineage = list()
 
-    for i in range(args.number_barcoded_clones):
-        this_barcode = randBarcode(args.pattern)
-        barcode_to_lineage.append(
-            {   this_barcode:
-                str(int(numpy.floor(numpy.random.uniform(0,args.number_lineages,1))))+"_"+this_barcode
-                }
-            )
-
-    with open(baseNameOut+".yaml","w") as f:
-        f.write(yaml.dump(barcode_to_lineage))
+    for i in range(args.number_lineages):
+        if args.fixed_barcodes_per_clone:
+            number_of_barcodes = int(args.barcodes_per_lineage)
+        else:
+            number_of_barcodes = int(numpy.floor(numpy.random.poisson(args.barcodes_per_lineage,1)))
+        for j in range(number_of_barcodes):
+            this_barcode = randBarcode(args.pattern)
+            barcode_to_lineage.append( [ this_barcode, i ] )
 
     with open(baseNameOut+".fasta","w") as f:
         for i in barcode_to_lineage:
-            f.write( "> "+ str(list(i.values())[0])+"\n"+ list(i.keys())[0] +"\n")
+            f.write( "> "+ str(i[1]) +"\n"+ str(i[0]) +"\n" )
 
 
