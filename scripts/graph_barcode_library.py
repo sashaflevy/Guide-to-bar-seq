@@ -11,32 +11,6 @@ import jellyfish
 #import datetime
 #import csv
 
-
-complement_dictionary = {
-    'A':'T', 'a':'t',
-    'C':'G', 'c':'g',
-    'T':'A', 't':'a',
-    'G':'C', 'g':'c'
-    }
-
-
-# recycling code from that SoBaSeq optimization business
-# this returns a random base
-# TODO should reimplement as being a list of letters to return and relative 
-# frequencies, just so it plays nice for testing informative nature of biased
-# base mixing. Should take that in as a base_mix dictionary.
-def randBase():
-    return str(["a","c","t","g"][int(numpy.floor(numpy.random.uniform(0,4,1)))])
-
-
-# This takes a pattern, and replaces every "N" in there with one of 4 bases.
-# TODO implement passing the base_mix dictionary through to the randBase().
-def randBarcode(pattern):
-    for i in range(re.subn("N","N",pattern)[1]):
-        pattern = re.sub("N",randBase(),pattern,count=1)
-    return(pattern)
-
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="")
@@ -61,6 +35,7 @@ if __name__ == '__main__':
 
     results_matrix = []
     graph = []
+    distances = numpy.array([])
     for i in range(len(all_barcodes)-1):
         results_row = []
         for j in range(len(all_barcodes)-1):
@@ -69,6 +44,7 @@ if __name__ == '__main__':
                     dist = jellyfish.levenshtein_distance(all_barcodes[i],all_barcodes[j])
                     results_row.append(dist)
                     graph.append([all_barcodes[i],all_barcodes[j],dist])
+                    distances = numpy.append(distances,dist)
                 else:
                     results_row.append(" ")
             else:
@@ -77,6 +53,7 @@ if __name__ == '__main__':
                     results_row.append(dist)
                     if j >= i :
                         graph.append([all_barcodes[i],all_barcodes[j],dist])
+                        distances = numpy.append(distances,dist)
         results_matrix.append(results_row)
 
     with open(args.outputbase+".tsv","w") as f:
@@ -87,3 +64,7 @@ if __name__ == '__main__':
         with open(args.outputbase+".graph","w") as f:
             for i in graph:
                 f.write( " ".join(str(j) for j in i)+"\n" );
+
+    with open(args.outputbase+"_summary.txt","w") as f:
+        f.write(str(numpy.percentile(distances,numpy.array([10,1,0.1,0.01])))+"\n")
+        f.write(str(numpy.nanmin(distances))+"\n")

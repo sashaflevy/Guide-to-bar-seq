@@ -20,14 +20,31 @@ script_eval_bartender_deviations = Channel
 script_eval_starcoded = Channel
     .fromPath("scripts/eval_starcode.py")
 
-script_plot_starcode = Channel
-    .fromPath("scripts/plot_eval.R")
+script_analysis_noise = Channel
+    .fromPath("scripts/analysis_noise.R")
 
 script_graph_barcode_library_py = Channel
     .fromPath("scripts/graph_barcode_library.py")
 
+
+make_id_strings = {
+        it["generation_id"] = it["barcode_pattern"]+
+            "_"+it["base_mix"]+"_"+
+            it["num_lineages"]+"lineages_"+it["num_barcodes_per"]+
+            "barcodesper_fixedBarcodesPer"+it["fixed_barcodes"]+
+            "_replicate"+it["replicate_id"] ; 
+        it["sampling_id"] = it["cell_sample_size"] ; \
+        it["sequencing_id"] = it["read_depth"]+"reads_"+
+            it["abundance_distribution"]+"abundanceDist_"+
+            it["error_rate"]+"error_"+
+            it["percentage_subs_indels"]+"subsAndIndels_"+
+            it["chimera_percentage"]+"chimeras_" // + it["slapchop_pattern"] ; 
+        return it ; 
+    } 
+
 parameters = Channel.fromPath("scripts/parameters_simulations.tsv")
     .splitCsv(header: true, strip: true, sep: "\t")
+    .map(make_id_strings)
 
 process make_barcoded_libraries {
     input: 
@@ -35,7 +52,7 @@ process make_barcoded_libraries {
         each parameters
     output: 
         set val(parameters), 
-            file({"barcodeLibrary_"+parameters["barcode_pattern"]+"_"+parameters["base_mix"].replaceAll(/,/,"-")+"_"+parameters["num_lineages"]+"lineages_"+parameters["num_barcodes_per"]+"barcodesper_fixedBarcodesPer"+parameters["fixed_barcodes"]+"_replicate"+parameters["replicate_id"]+".fasta"}) into barcoded_libraries
+            file({"barcodeLibrary_"+parameters["generation_id"]+".fasta"}) into barcoded_libraries
     shell:
     '''
     python3 !{script_make_degenerate_barcode_library_py} \
@@ -57,7 +74,8 @@ process measure_barcode_distances {
         each script_graph_barcode_library_py
         set val(parameters), file(barcode_fasta) from barcoded_libraries_graph
     output:
-        set file("barcodes.tsv"), file("barcodes.graph") into barcode_graph
+        set file("barcodes.tsv"), file("barcodes.graph"), 
+            file("barcodes_summary.txt") into barcode_graph
     shell:
     '''
     python3 !{script_graph_barcode_library_py} \
@@ -94,7 +112,7 @@ process grinder {
         -mutation_ratio !{parameters["percentage_subs_indels"]} \
         -chimera_perc !{parameters["chimera_percentage"]} \
         -abundance_model !{parameters["abundance_distribution"]} \
-        -random_seed 1234 \
+        -random_seed !{parameters["replicate"]} \
         -qual_levels 35 10 \
         -fastq_output 1 \
         -base_name grinder &> errorz
@@ -143,30 +161,24 @@ process eval_starcode {
         set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
             file(grinder_ranks), file(starcoded) from starcoded
     output:
-        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
-            file(grinder_ranks), file(starcoded), 
-            file("eval_starcoded.txt") into eval_starcoded
+        file({parameters["generation_id"]+"_"+parameters["sampling_id"]+"_"+parameters["sequencing_id"]+"_clone_code_input_output.tsv"}) into eval_tsvs
     shell:
     '''
-    python3 !{script_eval_starcoded} !{abundances} !{starcoded} eval_starcoded.txt
+    python3 !{script_eval_starcoded} !{abundances} !{starcoded} "!{parameters["generation_id"]}_!{parameters["sampling_id"]}_!{parameters["sequencing_id"]}_clone_code_input_output.tsv"
     '''
 }
 
-process plot_starcode {
+
+process collect_tsvs_for_analysis {
     publishDir "tmp"
     input:
-        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
-            file(grinder_ranks), file(starcoded), 
-            file(eval_starcoded) from eval_starcoded
-        each script_plot_starcode
+        file(each_tsv) from eval_tsvs.collect()
+        each script_analysis_noise
     output:
-        set file({"var_"+parameters['barcode_pattern']+"_"+parameters['num_lineages']+"lineages_"+parameters['num_barcoded_clones']+"clones_replicate"+parameters['replicate_id']+"_per_clone.png"}),
-            file({"var_"+parameters['barcode_pattern']+"_"+parameters['num_lineages']+"lineages_"+parameters['num_barcoded_clones']+"clones_replicate"+parameters['replicate_id']+"_per_code.png"}) into output
+        file("*.png") into summarize
     shell:
     '''
-    Rscript !{script_plot_starcode}
-    mv var_per_code.png var_!{parameters['barcode_pattern']}_!{parameters['num_lineages']}lineages_!{parameters['num_barcoded_clones']}clones_replicate!{parameters['replicate_id']}_per_code.png
-    mv var_per_clone.png var_!{parameters['barcode_pattern']}_!{parameters['num_lineages']}lineages_!{parameters['num_barcoded_clones']}clones_replicate!{parameters['replicate_id']}_per_clone.png
+    Rscript !{script_analysis_noise} 
     '''
 }
 

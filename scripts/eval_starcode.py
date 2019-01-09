@@ -11,6 +11,20 @@ if __name__ == '__main__':
     parser.add_argument("output",help="",type=str)
     args = parser.parse_args()
 
+#    parameters = eval(
+#        re.sub("\]","}",
+#            re.sub("\[","{",
+#                re.sub(", \"slapchop_pattern.+$","]",
+#                    re.sub(r':([^,]+), ','":"\g<1>", "',
+#                        re.sub("\[(.)","[\"\g<1>",args.parameters)
+#                        )
+#                    )
+#                )
+#            )
+#        )
+
+#    outputBase = "_".join(parameters.values())+args.outputSuffix
+
     clone_to_codes = dict()
     code_to_clone = dict()
     codes_to_input_counts = dict()

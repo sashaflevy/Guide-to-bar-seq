@@ -114,7 +114,7 @@ if __name__ == '__main__':
 
     barcode_to_lineage = list()
 
-    mix_num = numpy.array( [float(i) for i in re.split(",",args.mix)] )
+    mix_num = numpy.array( [float(i) for i in re.split("-",args.mix)] )
     mixing_dict = dict(zip( ["A","T","C","G"], mix_num ))
 
     for i in range(args.number_lineages):
