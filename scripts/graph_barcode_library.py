@@ -43,8 +43,9 @@ if __name__ == '__main__':
                 if j >= i :
                     dist = jellyfish.levenshtein_distance(all_barcodes[i],all_barcodes[j])
                     results_row.append(dist)
-                    graph.append([all_barcodes[i],all_barcodes[j],dist])
                     distances = numpy.append(distances,dist)
+                    if dist <= 1:
+                        graph.append([all_barcodes[i],all_barcodes[j],dist])
                 else:
                     results_row.append(" ")
             else:
@@ -52,7 +53,8 @@ if __name__ == '__main__':
                     dist = jellyfish.levenshtein_distance(all_barcodes[i],all_barcodes[j])
                     results_row.append(dist)
                     if j >= i :
-                        graph.append([all_barcodes[i],all_barcodes[j],dist])
+                        if dist <= 1:
+                            graph.append([all_barcodes[i],all_barcodes[j],dist])
                         distances = numpy.append(distances,dist)
         results_matrix.append(results_row)
 
