@@ -11,24 +11,23 @@ file("./reports").mkdirs()
 script_make_degenerate_barcode_library_py = Channel
     .fromPath("scripts/make_degenerate-barcode-library.py")
 
-script_sample_fasta_as_fasta = Channel
+script_sample_fasta_as_fasta_py = Channel
     .fromPath("scripts/sample_fasta_as_fasta.py")
 
-script_eval_bartender_deviations = Channel
+script_eval_bartender_deviations_py = Channel
     .fromPath("scripts/eval_bartender_deviations.py")
 
-script_eval_starcoded = Channel
+script_eval_starcoded_py = Channel
     .fromPath("scripts/eval_starcode.py")
-
-script_analysis_noise = Channel
-    .fromPath("scripts/analysis_noise.R")
-
-script_analysis_barcode_graph = Channel
-    .fromPath("scripts/analysis_barcode_graph.R")
 
 script_graph_barcode_library_py = Channel
     .fromPath("scripts/graph_barcode_library.py")
 
+script_analysis_noise_r = Channel
+    .fromPath("scripts/analysis_noise.R")
+
+script_analysis_barcode_graph_r = Channel
+    .fromPath("scripts/analysis_barcode_graph.R")
 
 make_id_strings = {
         it["generation_id"] = it["barcode_pattern"]+
@@ -51,7 +50,7 @@ parameters = Channel.fromPath("scripts/parameters_simulations.tsv")
 
 process make_barcoded_libraries {
     input: 
-        each script_make_degenerate_barcode_library_py
+        file script_make_degenerate_barcode_library_py
         each parameters
     output: 
         set val(parameters), 
@@ -74,7 +73,7 @@ process make_barcoded_libraries {
 process measure_barcode_distances {
     publishDir "tmp"
     input: 
-        each script_graph_barcode_library_py
+        file script_graph_barcode_library_py
         set val(parameters), file(barcode_fasta) from barcoded_libraries_graph
     output:
         set val(parameters), file("barcodes.tsv"), file("barcodes.graph"), 
@@ -110,7 +109,7 @@ process collect_barcode_graphs_for_analysis {
 
 process sample_abundance_library {
     input: 
-        each script_sample_fasta_as_fasta
+        file script_sample_fasta_as_fasta_py
         set val(parameters), file(barcode_fasta) from barcoded_libraries_sim
     output: 
         set val(parameters), file("barcode_library.fasta"), file("counted_abundances.txt") into sampled_libraries
@@ -182,7 +181,7 @@ process starcode {
 
 process eval_starcode {
     input:
-        each script_eval_starcoded
+        file script_eval_starcoded_py
         set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
             file(grinder_ranks), file(starcoded) from starcoded
     output:
@@ -198,7 +197,7 @@ process collect_tsvs_for_analysis {
     publishDir "tmp"
     input:
         file(each_tsv) from eval_tsvs.collect()
-        each script_analysis_noise
+        file script_analysis_noise_r
     output:
         file("*.png") into summarize_noise
     shell:
