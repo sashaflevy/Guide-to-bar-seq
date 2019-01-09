@@ -23,6 +23,9 @@ script_eval_starcoded = Channel
 script_analysis_noise = Channel
     .fromPath("scripts/analysis_noise.R")
 
+script_analysis_barcode_graph = Channel
+    .fromPath("scripts/analysis_barcode_graph.R")
+
 script_graph_barcode_library_py = Channel
     .fromPath("scripts/graph_barcode_library.py")
 
@@ -74,14 +77,36 @@ process measure_barcode_distances {
         each script_graph_barcode_library_py
         set val(parameters), file(barcode_fasta) from barcoded_libraries_graph
     output:
-        set file("barcodes.tsv"), file("barcodes.graph"), 
+        set val(parameters), file("barcodes.tsv"), file("barcodes.graph"), 
             file("barcodes_summary.txt") into barcode_graph
+        file({"barcode_distances_"+parameters["generation_id"]+".tsv"}) into barcode_graph_tsv
     shell:
     '''
     python3 !{script_graph_barcode_library_py} \
         --store-graph !{barcode_fasta} barcodes
+    cp barcodes.tsv barcode_distances_!{parameters["generation_id"]}.tsv
     '''
 }
+
+
+process collect_barcode_graphs_for_analysis {
+    publishDir "tmp"
+    input:
+        file script_analysis_barcode_graph
+        file(barcodes_tsv) from barcode_graph_tsv.collect()
+    output:
+        file("*.png") into summarize_graphs
+    shell:
+    '''
+    Rscript !{script_analysis_barcode_graph} 
+    '''
+}
+
+//
+//
+//
+//
+//
 
 process sample_abundance_library {
     input: 
@@ -175,7 +200,7 @@ process collect_tsvs_for_analysis {
         file(each_tsv) from eval_tsvs.collect()
         each script_analysis_noise
     output:
-        file("*.png") into summarize
+        file("*.png") into summarize_noise
     shell:
     '''
     Rscript !{script_analysis_noise} 
