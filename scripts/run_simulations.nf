@@ -11,8 +11,8 @@ file("./reports").mkdirs()
 script_make_degenerate_barcode_library_py = Channel
     .fromPath("scripts/make_degenerate-barcode-library.py")
 
-script_sample_yaml_as_fasta = Channel
-    .fromPath("scripts/sample_yaml_as_fasta.py")
+script_sample_fasta_as_fasta = Channel
+    .fromPath("scripts/sample_fasta_as_fasta.py")
 
 script_eval_bartender_deviations = Channel
     .fromPath("scripts/eval_bartender_deviations.py")
@@ -55,35 +55,34 @@ process measure_barcode_distances {
     publishDir "tmp"
     input: 
         each script_graph_barcode_library_py
-        set val(parameters), file(barcode_yaml), file(barcode_fasta) from barcoded_libraries_graph
+        set val(parameters), file(barcode_fasta) from barcoded_libraries_graph
     output:
-        set file("barcode_graph.tsv"), file("barcode_graph.graph") into barcode_graph
+        set file("barcodes.tsv"), file("barcodes.graph") into barcode_graph
     shell:
     '''
     python3 !{script_graph_barcode_library_py} \
-        --store-graph --yaml \
-        !{barcode_yaml} barcode_graph
+        --store-graph !{barcode_fasta} barcodes
     '''
 }
 
 process sample_abundance_library {
     input: 
-        each script_sample_yaml_as_fasta
-        set val(parameters), file(barcode_yaml), file(barcode_fasta) from barcoded_libraries_sim
+        each script_sample_fasta_as_fasta
+        set val(parameters), file(barcode_fasta) from barcoded_libraries_sim
     output: 
-        set val(parameters), file(barcode_yaml), file("barcode_library.fasta"), file("counted_abundances.txt") into sampled_libraries
+        set val(parameters), file("barcode_library.fasta"), file("counted_abundances.txt") into sampled_libraries
     shell:
     '''
-    python3 !{script_sample_yaml_as_fasta} !{barcode_yaml} !{parameters["cell_sample_size"]} barcode_library.fasta abundances.txt
-    cat abundances.txt | sort | uniq -c > counted_abundances.txt
+    python3 !{script_sample_fasta_as_fasta} !{barcode_fasta} !{parameters["cell_sample_size"]} barcode_library.fasta
+    grep "> " barcode_library.fasta | sed 's/> //' | sort -n | uniq -c > counted_abundances.txt
     '''
 }
 
 process grinder {
     input:
-        set val(parameters), file(yaml), file(fasta), file(abundances) from sampled_libraries
+        set val(parameters), file(fasta), file(abundances) from sampled_libraries
     output:
-        set val(parameters), file(yaml), file(abundances), file("grinder-reads.fastq"), 
+        set val(parameters), file(fasta), file(abundances), file("grinder-reads.fastq"), 
             file("grinder-ranks.txt") into grinder_output 
     shell:
     '''
@@ -105,10 +104,10 @@ process grinder {
 
 process slapchop {
     input:
-        set val(parameters), file(yaml), file(abundances), file(grinder_fastq), 
+        set val(parameters), file(fasta), file(abundances), file(grinder_fastq), 
             file(grinder_ranks) from grinder_output 
     output:
-        set val(parameters), file(yaml), file(abundances), file("basename_pass.fastq"), 
+        set val(parameters), file(fasta), file(abundances), file("basename_pass.fastq"), 
             file(grinder_ranks) into slapchoped_fastq 
     shell: 
     '''
@@ -123,10 +122,10 @@ process slapchop {
 
 process starcode {
     input:
-        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
             file(grinder_ranks) from slapchoped_fastq 
     output:
-        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
             file(grinder_ranks), file("starcoded") into starcoded
     shell:
     '''
@@ -141,10 +140,10 @@ process starcode {
 process eval_starcode {
     input:
         each script_eval_starcoded
-        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
             file(grinder_ranks), file(starcoded) from starcoded
     output:
-        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
             file(grinder_ranks), file(starcoded), 
             file("eval_starcoded.txt") into eval_starcoded
     shell:
@@ -156,7 +155,7 @@ process eval_starcode {
 process plot_starcode {
     publishDir "tmp"
     input:
-        set val(parameters), file(yaml), file(abundances), file(slapchop_pass), 
+        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
             file(grinder_ranks), file(starcoded), 
             file(eval_starcoded) from eval_starcoded
         each script_plot_starcode
@@ -171,46 +170,6 @@ process plot_starcode {
     '''
 }
 
-//
-//tmp/sample%_clustered_lineage_tags.starclust: \
-//	tmp/sample%_lineageF_pass.fastq.conformed tmp/sample%_lineageR_pass.fastq.conformed
-//	-starcode \
-//		-1 $(word 1,$^) -2 $(word 2,$^) \
-//		-s \
-//		-t 3 --print-clusters > $@
-//
-//tmp/sample%_clustered_lineage_tags.counts: \
-//	tmp/sample%_clustered_lineage_tags.starclust
-//	gawk '{print $3}' $< | sort -rg | uniq -c > $@
-//
-//
-//process label_counts {
-//    input:
-//        set MM, file(this_counts_file) from results
-//    output:
-//        file "labeled_counts.tsv" into labeled_results
-//    shell: 
-//        '''
-//        cat !{this_counts_file} | sed "s/^/!{MM}MM_/" > labeled_counts.tsv
-//        '''
-//}
-//
-//process concat_counts {
-//    publishDir "tmp", mode: 'copy'
-//    input:
-//        file 'labeled_counts_list' from labeled_results.collect()
-//    output:
-//        file "all_counts.tsv"
-//    shell: 
-//        '''
-//        head -n 1 labeled_counts_list1 | \
-//            sed 's/^[0-9]*MM_//' | sed 's/Strain/Observation/' \
-//            > all_counts.tsv
-//        for i in $(ls labeled_counts_list*)
-//            do cat ${i} | tail -n+2 >> all_counts.tsv
-//        done
-//        '''
-//}
 
 // // Special trigger for `onComplete`. I copied this from documentation.
 // // Some predefined variables. It somehow mails it. Cool.
@@ -235,47 +194,4 @@ process plot_starcode {
 //}
 
 
-//process bartender_extract {
-//    publishDir "tmp"
-//    input:
-//        set parameters, file(yaml), file(abundances), file(input_fastq), file(input_ranks) from grinder_output 
-//    output:
-//        set parameters, file(yaml), file(abundances), file(input_ranks), file("extracted_barcode.tsv") into bartender_extracted_codes 
-//    shell:
-//    '''
-//    bartender_extractor_com -f !{input_fastq} -o extracted -q ? \
-//        -p !{parameters["bartender_pattern"]} -m 2
-//    '''
-//}
-//
-//process bartender_quant {
-//    publishDir "tmp"
-//    input:
-//        set parameters, file(yaml), file(abundances), file(input_ranks), file(extracted_barcodes) from bartender_extracted_codes 
-//    output:
-//        set parameters, file(yaml), file(abundances), file(input_ranks),
-//            file("barcode_quant_barcode.csv"),
-//            file("barcode_quant_cluster.csv"),
-//            file("barcode_quant_quality.csv") into bartender_quantifications
-//    shell:
-//    '''
-//    bartender_single_com -f !{extracted_barcodes} \
-//        -o barcode_quant -d 3
-//    '''
-//}
-//
-//process bartender_eval {
-//    publishDir "tmp"
-//    input:
-//        set parameters, file(yaml), file(abundances), file(input_ranks),
-//            file(bartender_quant_barcode),
-//            file(bartender_quant_cluster),
-//            file(bartender_quant_quality) from bartender_quantifications
-//        each script_eval_bartender_deviations
-//    output:
-//        set parameters, file("bartender_deviations.csv") into bartender_deviations
-//    shell:
-//    '''
-//    python3 !{script_eval_bartender_deviations} !{yaml} !{abundances} !{bartender_quant_cluster} !{bartender_quant_cluster} "!{parameters['barcode_pattern']}"
-//    '''
-//}
+
