@@ -1,5 +1,7 @@
 #!/usr/bin/env nextflow
 
+import groovyx.gpars.dataflow.operator.PoisonPill
+
 // This is a nextflow for analyzing the contribution of experimental design to
 // theoretical measurements of DNA barcode libraries.
 
@@ -13,28 +15,43 @@ file("./reports").mkdirs()
 //
 
 barcode_parameters = Channel.from(
-    [ "barcode_name":"six-base", "barcode_pattern":"NNNNNN", "base_mix":"1-1-1-1", "chimera_length":"2", ] 
+    [ "bname":"six-base", "bpattern":"NNNNNN", // barcode name and pattern
+        "bmix":"1-1-1-1", "clength":"2", // nucleotide mix and chimeria length (for grinder)
+        "slapchopre":"(?P<barcode>[ATCG]{5,7}){e<=0}", 
+        "bartenderpat":"" ],
     )
-
-// "slapchop_pattern":"(?P<barcode>[ATCG]{5,7}){e<=0}", "bartender_pattern":"" ],
+    .concat(Channel.from(PoisonPill.instance))
 
 library_parameters = Channel.from(
-    [ "barcode_name":"six-base", "num_lineages":"10", "num_barcodes_per":"1.0", "fixed_barcodes":"True" ],
+    [ "bname":"six-base", "lineages":"10", "codesper":"1.0", "fixedper":"True" ], // name, number lineages, number codes per lineage, fixed number or poisson
     )
-    .combine( Channel.from( ["lib_rep":"a"], ["lib_rep":"b"], ["lib_rep":"c"] ) )
+    .combine( Channel.from( ["librep":"a"], ["librep":"b"], ["librep":"c"] ) )
     .map{ it[0] + it[1] } 
+    .concat(Channel.from(PoisonPill.instance))
 
 sampling_parameters = Channel.from(
-    [ "cell_sample_size":"100" ],
+    [ "csample":"100" ], // cell sample size
     )
-    .combine( Channel.from( ["sample_rep":"a"] ) )
+    .combine( Channel.from( ["samrep":"a"] ) )
     .map{ it[0] + it[1] } 
 
 sequencing_parameters = Channel.from(
-    [ "read_depth":"1000", "single_error_rate":"uniform0.0", "percentage_substitutions":"80", "percentage_indels":"20", "chimera_percentage":"01" ],
+    [ "rdepth":"1000", "serror":"uniform0.0", "subrate":"80", "indelrate":"20", "crate":"01" ], // read depth, single base error distribution, sub rate percentage for singles, indel rate percentage for singles, chimera rate in percentage
     )
-    .combine( Channel.from( ["seq_rep":"a"] ) )
+    .combine( Channel.from( ["seqrep":"a"] ) )
     .map{ it[0] + it[1] } 
+    .concat(Channel.from(PoisonPill.instance))
+
+//
+//
+//
+ 
+make_safe_name = { 
+    it.each{ key, value -> key+'='+value }
+        .collect().join('_')
+        .replaceAll("[\\(\\)<>]","").replaceAll(",",".") 
+        .replaceAll("[aeiou]","")
+    } 
 
 //
 //
@@ -51,13 +68,13 @@ process make_barcoded_libraries {
         set val(parameters), file("barcodeLibrary*.fasta") into barcoded_libraries
     shell:
     '''
-    python3 mbl.py !{parameters["barcode_pattern"]} \
-        --mix !{parameters["base_mix"]} \
-        --number-lineages !{parameters["num_lineages"]} \
-        --barcodes-per-lineage !{parameters["num_barcodes_per"]} \
-        --fixed-barcodes-per-clone !{parameters["fixed_barcodes"]} \
-        --replicate !{parameters["replicate"]} \
-        barcodeLibrary_!{parameters.each{ key, value -> key+'='+value }.collect().join('_')}
+    python3 mbl.py !{parameters["bpattern"]} \
+        --mix !{parameters["bmix"]} \
+        --number-lineages !{parameters["lineages"]} \
+        --barcodes-per-lineage !{parameters["codesper"]} \
+        --fixed-barcodes-per-clone !{parameters["fixedper"]} \
+        --replicate !{parameters["librep"]} \
+        barcodeLibrary_!{make_safe_name(parameters)}
     '''
 }
 
@@ -66,7 +83,8 @@ process make_barcoded_libraries {
 // between channels of values. Sounds slick, but that means you can't reliably
 // fork. So, a hack:
 
-( copy1, copy2 ) = barcoded_libraries.into(2)
+( copy1, copy2 ) = barcoded_libraries
+    .into(2)
 
 barcoded_libraries_to_analyze = Channel.create()
 copy1.subscribe{ barcoded_libraries_to_analyze.bind(it)  }
@@ -93,9 +111,8 @@ process measure_barcode_distances {
         file("barcode_distances_*.tsv") into barcode_graph_tsv
     shell:
     '''
-    echo barcode_distances_!{parameters}
     python3 gbl.py --store-graph !{barcode_fasta} \
-        barcode_distances_!{parameters.each{ key, value -> key+'='+value }.collect().join('_')}
+        barcode_distances_!{make_safe_name(parameters)}
     '''
 }
 
@@ -120,6 +137,7 @@ process analyze_barcode_graphs {
 
 
 // !{parameters.each{ key, value -> key+'='+value }.collect().join('_')}
+// !{make_safe_name(parameters)}
 
 process sample_abundance_library {
     input: 
@@ -129,7 +147,7 @@ process sample_abundance_library {
         set val(parameters), file("barcode_library.fasta"), file("counted_abundances.txt") into sampled_libraries_from_sampler
     shell:
     '''
-    python3 sff.py !{barcode_fasta} !{parameters["cell_sample_size"]} barcode_library.fasta
+    python3 sff.py !{barcode_fasta} !{parameters["csample"]} barcode_library.fasta
     grep "> " barcode_library.fasta | sed 's/> //' | sort -n | uniq -c > counted_abundances.txt
     '''
 }
@@ -146,120 +164,119 @@ process grinder {
     input:
         set val(parameters), file(fasta), file(abundances) from sampled_libraries_for_grinder
     output:
-        set val(parameters), file(fasta), file(abundances), file("grinder-reads.fastq"), 
-            file("grinder-ranks.txt") into grinder_output 
+        set val(parameters), file(fasta), file(abundances), 
+            file("grinder-reads.fastq") into sequenced_fastq
     shell:
     '''
     grinder -reference_file !{fasta} \
-        -total_reads !{parameters["read_depth"]} \
+        -total_reads !{parameters["rdepth"]} \
         -read_dist 150 \
         -unidirectional 1 \
         -mutation_dist !{parameters["single_error_rate"]} \
-        -mutation_ratio !{parameters["percentage_substitutions"]+" "+parameters["percentage_indels"]} \
-        -chimera_perc !{parameters["chimera_percentage"]} \
-        -ck !{parameters["chimera_length"]} \
+        -mutation_ratio !{parameters["subrate"]+" "+parameters["indelrate"]} \
+        -chimera_perc !{parameters["crate"]} \
+        -ck !{parameters["clength"]} \
         -abundance_model uniform \
-        -random_seed !{parameters["seq_rep"]} \
+        -random_seed !{parameters["seqrep"]} \
         -qual_levels 35 10 \
         -fastq_output 1 \
         -base_name grinder
     '''
 }
 
-script_eval_bartender_deviations_py = Channel.fromPath("scripts/eval_bartender_deviations.py")
-script_eval_starcoded_py = Channel.fromPath("scripts/eval_starcode.py")
-script_analysis_noise_r = Channel.fromPath("scripts/analysis_noise.R")
-
 //
 //
 //
 
+slapchop_input = Channel.create()
+sequenced_fastq.into(slapchop_input)
+
+process slapchop {
+    input:
+        set val(parameters), file(fasta), file(abundances), 
+            file(grinder_fastq) from slapchop_input
+    output:
+        set val(parameters), file(fasta), file(abundances), 
+            file("basename_pass.fastq") into slapchopd_fastq
+    shell: 
+    '''
+	python3 /slapchop.py !{grinder_fastq} basename \
+        --bite-size 10000 --processes !{task.cpus}    \
+        -o "GetLineageRead1: input > !{parameters["slapchopre"]}" \
+        --output-seq "barcode" \
+        --output-id "input.id" \
+        --verbose
+    '''
+}
+
+process starcode {
+    input:
+        set val(parameters), file(fasta), file(abundances), 
+            file(slapchop_pass) from slapchopd_fastq
+    output:
+        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
+            file("starcoded") into starcoded
+    shell:
+    '''
+    starcode --threads !{task.cpus} \
+        -d 3 --cluster-ratio 10 \
+        --input !{slapchop_pass} \
+        --print-clusters --seq-id \
+        --output starcoded
+    '''
+}
+
+process eval_starcode {
+    input:
+        each file("es.py") from Channel.fromPath("scripts/eval_starcode.py")
+        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
+            file(starcoded) from starcoded
+    output:
+        file("*tsv") into eval_tsvs
+    shell:
+    '''
+    python3 es.py !{abundances} !{starcoded} \
+        counts_!{make_safe_name(parameters)}.tsv
+    '''
+}
+
+// script_eval_bartender_deviations_py = Channel.fromPath("scripts/eval_bartender_deviations.py")
+
+process collect_tsvs_for_analysis {
+    publishDir "tmp"
+    input:
+        file(each_tsv) from eval_tsvs.collect()
+        each file("an.R") from Channel.fromPath("scripts/analysis_noise.R")
+    output:
+        file("*.png") into summarize_noise
+    shell:
+    '''
+    Rscript an.R
+    '''
+}
 
 
-//process slapchop {
-//    input:
-//        set val(parameters), file(fasta), file(abundances), file(grinder_fastq), 
-//            file(grinder_ranks) from grinder_output 
-//    output:
-//        set val(parameters), file(fasta), file(abundances), file("basename_pass.fastq"), 
-//            file(grinder_ranks) into slapchoped_fastq 
-//    shell: 
-//    '''
-//	python3 /slapchop.py !{grinder_fastq} basename \
-//        --bite-size 10000 --processes !{task.cpus}    \
-//        -o "GetLineageRead1: input > !{parameters["slapchop_pattern"]}" \
-//        --output-seq "barcode" \
-//        --output-id "input.id" \
-//        --verbose > stdout
-//    '''
+// // Special trigger for `onComplete`. I copied this from documentation.
+// // Some predefined variables. It somehow mails it. Cool.
+//workflow.onComplete {
+//    println "Pipeline completed at: $workflow.complete"
+//    println "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
+//
+//    def subject = 'barnone run'
+//    def recipient = email_address
+//
+//    ['mail', '-s', subject, recipient].execute() << """
+//
+//    Pipeline execution summary
+//    ---------------------------
+//    Completed at: ${workflow.complete}
+//    Duration        : ${workflow.duration}
+//    Success         : ${workflow.success}
+//    workDir         : ${workflow.workDir}
+//    exit status : ${workflow.exitStatus}
+//    Error report: ${workflow.errorReport ?: '-'}
+//    """
 //}
-//
-//process starcode {
-//    input:
-//        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
-//            file(grinder_ranks) from slapchoped_fastq 
-//    output:
-//        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
-//            file(grinder_ranks), file("starcoded") into starcoded
-//    shell:
-//    '''
-//    starcode --threads !{task.cpus} \
-//        -d 3 --cluster-ratio 10 \
-//        --input !{slapchop_pass} \
-//        --print-clusters --seq-id \
-//        --output starcoded
-//    '''
-//}
-//
-//process eval_starcode {
-//    input:
-//        file script_eval_starcoded_py
-//        set val(parameters), file(fasta), file(abundances), file(slapchop_pass), 
-//            file(grinder_ranks), file(starcoded) from starcoded
-//    output:
-//        file({parameters["generation_id"]+"_"+parameters["sampling_id"]+"_"+parameters["sequencing_id"]+"_clone_code_input_output.tsv"}) into eval_tsvs
-//    shell:
-//    '''
-//    python3 !{script_eval_starcoded} !{abundances} !{starcoded} "!{parameters["generation_id"]}_!{parameters["sampling_id"]}_!{parameters["sequencing_id"]}_clone_code_input_output.tsv"
-//    '''
-//}
-//
-//
-//process collect_tsvs_for_analysis {
-//    publishDir "tmp"
-//    input:
-//        file(each_tsv) from eval_tsvs.collect()
-//        file script_analysis_noise_r
-//    output:
-//        file("*.png") into summarize_noise
-//    shell:
-//    '''
-//    Rscript !{script_analysis_noise} 
-//    '''
-//}
-//
-//
-//// // Special trigger for `onComplete`. I copied this from documentation.
-//// // Some predefined variables. It somehow mails it. Cool.
-////workflow.onComplete {
-////    println "Pipeline completed at: $workflow.complete"
-////    println "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
-////
-////    def subject = 'barnone run'
-////    def recipient = email_address
-////
-////    ['mail', '-s', subject, recipient].execute() << """
-////
-////    Pipeline execution summary
-////    ---------------------------
-////    Completed at: ${workflow.complete}
-////    Duration        : ${workflow.duration}
-////    Success         : ${workflow.success}
-////    workDir         : ${workflow.workDir}
-////    exit status : ${workflow.exitStatus}
-////    Error report: ${workflow.errorReport ?: '-'}
-////    """
-////}
-//
-//
-//
+
+
+
