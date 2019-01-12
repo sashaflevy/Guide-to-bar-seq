@@ -93,23 +93,25 @@ if __name__ == '__main__':
             "Otherwise, it gets a poisson distribution of barcodes with mean "+
             "as the number of barcodes-per-lineage.",
         type=bool)
-    parser.add_argument("outbase",help="The base filename to write out to. "+
-            "This should describe the parameters, basically. It'll then have "+
-            "a FASTA generated onto that basename. The ID is the lineage ID, "+
-            "then it's the barcode.",
+    parser.add_argument("output",help="The filename to write, fasta",
+#    parser.add_argument("outbase",help="The base filename to write out to. "+
+#            "This should describe the parameters, basically. It'll then have "+
+#            "a FASTA generated onto that basename. The ID is the lineage ID, "+
+#            "then it's the barcode.",
         type=str)
     parser.add_argument("--replicate",help="A replicate ID to prevent "+
             "filename collisions, this is just tacked onto the end.",
         default="", type=str)
     args = parser.parse_args()
 
-    baseNameOut = (
-        args.outbase+"_"+args.pattern+"_"+
-            re.sub(",","-",args.mix)+"_"+str(args.number_lineages)+"lineages_"+
-            str(args.barcodes_per_lineage)+"barcodesper_fixedBarcodesPer"+
-            str(args.fixed_barcodes_per_clone)+"_replicate"+args.replicate
-        )
+#    baseNameOut = (
+#        args.outbase+"_"+args.pattern+"_"+
+#            re.sub(",","-",args.mix)+"_"+str(args.number_lineages)+"lineages_"+
+#            str(args.barcodes_per_lineage)+"barcodesper_fixedBarcodesPer"+
+#            str(args.fixed_barcodes_per_clone)+"_replicate"+args.replicate
+#        )
 
+    baseNameOut = args.output
     print("Printing this out to : "+baseNameOut)
 
     barcode_to_lineage = list()

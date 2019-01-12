@@ -16,7 +16,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("barcode_file",help="file",type=str)
     parser.add_argument("--yaml",help="is yaml?",action="store_true")
-    parser.add_argument("outputbase",help="out",type=str)
+    parser.add_argument("output",help="out",type=str)
     parser.add_argument("--store-graph",help="store a graph?",action="store_true")
     parser.add_argument("--print-as-matrix",help="do an upper triangle?",
         action="store_true")
@@ -58,15 +58,15 @@ if __name__ == '__main__':
                         distances = numpy.append(distances,dist)
         results_matrix.append(results_row)
 
-    with open(args.outputbase+".tsv","w") as f:
+    with open(args.output+".tsv","w") as f:
         for i in results_matrix:
             f.write( " ".join(str(j) for j in i)+"\n" );
 
     if args.store_graph:
-        with open(args.outputbase+".graph","w") as f:
+        with open(args.output+".graph","w") as f:
             for i in graph:
                 f.write( " ".join(str(j) for j in i)+"\n" );
 
-    with open(args.outputbase+"_summary.txt","w") as f:
+    with open(args.output+"_summary.txt","w") as f:
         f.write(str(numpy.percentile(distances,numpy.array([10,1,0.1,0.01])))+"\n")
         f.write(str(numpy.nanmin(distances))+"\n")
