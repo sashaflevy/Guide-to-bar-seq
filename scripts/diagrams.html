@@ -1,0 +1,107 @@
+<html>
+<head>
+<meta charset="utf-8"/>
+    <!--<script type="text/javascript" src="http://livejs.com/live.js"></script>-->
+<script src='https://d3js.org/d3.v4.min.js'></script>
+<style>
+body { font-family: "DejaVu Sans"  }
+
+</style>
+</head>
+<body>
+<script>
+
+//
+//
+//
+//
+//
+
+var svg = d3.select("body").append("svg")
+    .attr("width","500").attr("height","500")
+
+var curve_dna_fragments = [
+    {"id":"gDNA","x1": 50, "y1":50, "cx1": 100, "cy1": 30, "cx2": 250, "cy2": 30, "x2": 300, "y2": 50, "stroke":"black", "stroke_width":04, "label_text":"", "y_adjust": -20},
+    ]
+
+svg.selectAll("path")
+    .data(curve_dna_fragments,function(d){return d.id}).enter()
+    .append("path")
+    .attr("fill","transparent")
+    .attr("stroke",function(d){return d.stroke})
+    .attr("stroke-width",function(d){return d.stroke_width})
+    .attr("d",function(d){return "M "+d.x1+" "+d.y1+" C "+d.cx1+" "+d.cy1+" "+d.cx2+" "+d.cy2+" "+d.x2+" "+d.y2})
+
+svg.selectAll("text")
+    .data(curve_dna_fragments,function(d){return d.id}).enter()
+    .append("text")
+    .attr("text-anchor","middle")
+    .attr("font-size","12px")
+    .attr("x",function(d){return (d.x1+d.x2)/2})
+    .attr("y",function(d){return (d.cy1+d.cy2)/2+d.y_adjust})
+    .text(function(d){return d.label_text})
+
+//
+//
+//
+//
+//
+
+var orfs = [
+    {"id":"barcode", "x1": 100, "y1":38, "cx1": 150, "cy1": 30, "cx2": 200, "cy2": 30, "x2": 250, "y2": 38, "stroke":"black", "stroke_width":01, "label_text":"barcode", "y_adjust": -4, "fill": "pink", "height":-20},
+    ]
+
+svg.selectAll("path")
+    .data(orfs,function(d){return d.id}).enter()
+    .append("path")
+    .attr("fill",function(d){return d.fill})
+    .attr("stroke",function(d){return d.stroke})
+    .attr("stroke-width",function(d){return d.stroke_width})
+    .attr("d",function(d){return "M "+d.x1+" "+d.y1+" C "+d.cx1+" "+d.cy1+" "+d.cx2+" "+d.cy2+" "+d.x2+" "+d.y2+" L "+d.x2+" "+(d.y2+d.height)+" C "+d.cx2+" "+(d.cy2+d.height)+" "+d.cx1+" "+(d.cy1+d.height)+" "+d.x1+" "+(d.y1+d.height)+" L "+d.x1+" "+d.y1})
+
+svg.selectAll("text")
+    .data(orfs,function(d){return d.id}).enter()
+    .append("text")
+    .attr("text-anchor","middle")
+    .attr("font-size","12px")
+    .attr("x",function(d){return (d.x1+d.x2)/2})
+    .attr("y",function(d){return (d.cy1+d.cy2)/2+d.y_adjust})
+    .text(function(d){return d.label_text})
+
+//
+//
+//
+//
+//
+
+var straight_dna_fragments = [
+    {"x1": 100, "y1":100, "x2": 200, "y2":100, "stroke":"black", "stroke_width":04, "label_text":""},
+    ]
+
+svg.selectAll("line")
+    .data(straight_dna_fragments).enter()
+    .append("line")
+    .attr("x1",function(d){return d.x1})
+    .attr("y1",function(d){return d.y1})
+    .attr("x2",function(d){return d.x2})
+    .attr("y2",function(d){return d.y2})
+    .attr("stroke-width",function(d){return d.stroke_width})
+    .attr("stroke",function(d){return d.stroke})
+
+
+//
+//
+//
+//
+//
+
+//
+//
+//
+//
+//
+
+</script>
+
+</body>
+</html>
